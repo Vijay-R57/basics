@@ -1,10 +1,11 @@
 {
     "compilerOptions": {
-        "moduleResolution": "node",
+        "moduleResolution": "bundler",
         "target": "esnext",
         "module": "esnext",
         "allowJs": true,
         "skipLibCheck": true,
+        "noEmit": true,
         "types": [
             "@types/deno"
         ],
@@ -16,4 +17,4 @@
             }
         ]
     }
-}
+}

@@ -44,5 +44,5 @@ ALTER TABLE public.analysis_logs
 -- Add a scoring_method column so we can track which pipeline
 -- generated each result (CV Engine vs Gemini fallback).
 ALTER TABLE public.analysis_logs
-  ADD COLUMN IF NOT EXISTS scoring_method TEXT DEFAULT 'gemini-fallback',
+  ADD COLUMN IF NOT EXISTS scoring_method TEXT DEFAULT 'CV Engine',
   ADD COLUMN IF NOT EXISTS cv_metrics     JSONB;

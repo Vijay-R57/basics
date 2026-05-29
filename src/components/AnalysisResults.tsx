@@ -1,40 +1,12 @@
-import { Download, CheckCircle, AlertTriangle, TrendingUp, Clock, Wrench, ShieldCheck, Info } from "lucide-react";
+import { Download, CheckCircle, AlertTriangle, TrendingUp, Clock, Wrench, ShieldCheck, Info, BarChart3, Search } from "lucide-react";
 import jsPDF from "jspdf";
+import ScoreExplanationCard from "@/components/ScoreExplanationCard";
+import BeforeAfterComparison from "@/components/BeforeAfterComparison";
+import { PILLAR_META } from "@/types/analysis";
 
-export interface FiveSScore {
-  sort: number;
-  setInOrder: number;
-  shine: number;
-  standardize: number;
-  sustain: number;
-}
-
-export interface ScoreExplanations {
-  sort: string;
-  setInOrder: string;
-  shine: string;
-  standardize: string;
-  sustain: string;
-}
-
-export interface AnalysisData {
-  overview: string;
-  beforeScores: FiveSScore;
-  afterScores: FiveSScore;
-  beforeExplanations: ScoreExplanations;
-  afterExplanations: ScoreExplanations;
-  recommendations: string[];
-  improvements: string[];
-  leanMaintenanceScore: number;
-  leanMaintenanceExplanation: string;
-}
-
-const categories = [
-{ key: "sort" as const, label: "Sort", jp: "Seiri", desc: "Removing unnecessary items" },
-{ key: "setInOrder" as const, label: "Set in Order", jp: "Seiton", desc: "Organizing remaining items" },
-{ key: "shine" as const, label: "Shine", jp: "Seiso", desc: "Cleaning and maintaining" },
-{ key: "standardize" as const, label: "Standardize", jp: "Seiketsu", desc: "Creating standards" },
-{ key: "sustain" as const, label: "Sustain", jp: "Shitsuke", desc: "Maintaining discipline" }];
+// Re-export for backward compat with pages that import from this file
+import type { AnalysisData, FiveSScore, ScoreExplanations } from "@/types/analysis";
+export type { AnalysisData, FiveSScore, ScoreExplanations };
 
 
 const getScoreColor = (score: number) => {
@@ -59,6 +31,17 @@ interface Props {
 }
 
 const AnalysisResults = ({ data, beforeImage, afterImage, analysisTimestamp, beforeUploadTime, afterUploadTime }: Props) => {
+  // Guard: only the display-safe scoringMethod field is checked here.
+  // rawScoringMethod intentionally contains full CV engine telemetry (including
+  // the Gemini explanation-layer tag) and is NEVER inspected by this guard.
+  const scoringMethod = data.scoringMethod || "";
+  if (
+    scoringMethod.toLowerCase().includes("fallback") ||
+    scoringMethod.toLowerCase().includes("gemini")
+  ) {
+    throw new Error("Deterministic scoring violation detected.");
+  }
+
   const avgBefore = Math.round(Object.values(data.beforeScores).reduce((a, b) => a + b, 0) / 5);
   const avgAfter = Math.round(Object.values(data.afterScores).reduce((a, b) => a + b, 0) / 5);
   const timestamp = analysisTimestamp || new Date().toISOString();
@@ -73,6 +56,34 @@ const AnalysisResults = ({ data, beforeImage, afterImage, analysisTimestamp, bef
     const doc = new jsPDF();
     const pageWidth = doc.internal.pageSize.getWidth();
     let y = 20;
+
+    const checkPage = (heightNeeded: number) => {
+      if (y + heightNeeded > 275) {
+        doc.addPage();
+        y = 20;
+      }
+    };
+
+    const addParagraph = (
+      text: string,
+      fontSize = 10,
+      fontStyle = "normal",
+      textColor = [60, 60, 60],
+      indent = 15,
+      spacing = 5
+    ) => {
+      doc.setFont("times", fontStyle);
+      doc.setFontSize(fontSize);
+      doc.setTextColor(textColor[0], textColor[1], textColor[2]);
+      
+      const lines = doc.splitTextToSize(text, pageWidth - indent - 15);
+      
+      lines.forEach((line: string) => {
+        checkPage(5);
+        doc.text(line, indent, y);
+        y += spacing;
+      });
+    };
 
     // Title
     doc.setFont("times", "bold");
@@ -102,39 +113,34 @@ const AnalysisResults = ({ data, beforeImage, afterImage, analysisTimestamp, bef
     y += 8;
 
     // Overview
+    checkPage(15);
     doc.setFont("times", "bold");
     doc.setFontSize(13);
     doc.setTextColor(40, 40, 40);
     doc.text("Analysis Overview", 15, y);
     y += 7;
-    doc.setFont("times", "normal");
-    doc.setFontSize(10);
-    doc.setTextColor(60, 60, 60);
-    const overviewLines = doc.splitTextToSize(data.overview, pageWidth - 30);
-    doc.text(overviewLines, 15, y);
-    y += overviewLines.length * 5 + 8;
+    addParagraph(data.overview, 10, "normal", [60, 60, 60], 15, 5);
+    y += 4;
 
     // Lean Maintenance Score
+    checkPage(15);
     doc.setFont("times", "bold");
     doc.setFontSize(13);
     doc.setTextColor(40, 40, 40);
     doc.text("Lean Maintenance Score", 15, y);
     y += 7;
-    doc.setFont("times", "normal");
-    doc.setFontSize(11);
+    doc.setFont("times", "bold");
+    doc.setFontSize(14);
     doc.setTextColor(37, 99, 71);
     doc.text(`${data.leanMaintenanceScore}%`, 15, y);
     y += 6;
-    doc.setFontSize(9);
-    doc.setTextColor(60, 60, 60);
     if (data.leanMaintenanceExplanation) {
-      const lmLines = doc.splitTextToSize(data.leanMaintenanceExplanation, pageWidth - 30);
-      doc.text(lmLines, 15, y);
-      y += lmLines.length * 4.5 + 8;
+      addParagraph(data.leanMaintenanceExplanation, 9, "normal", [60, 60, 60], 15, 4.5);
+      y += 4;
     }
 
     // 5S Scores
-    if (y > 240) {doc.addPage();y = 20;}
+    checkPage(20);
     doc.setFont("times", "bold");
     doc.setFontSize(13);
     doc.setTextColor(40, 40, 40);
@@ -150,8 +156,8 @@ const AnalysisResults = ({ data, beforeImage, afterImage, analysisTimestamp, bef
     doc.text("Change", 125, y);
     y += 6;
 
-    categories.forEach((cat) => {
-      if (y > 265) {doc.addPage();y = 20;}
+    PILLAR_META.forEach((cat) => {
+      checkPage(25);
       const before = data.beforeScores[cat.key];
       const after = data.afterScores[cat.key];
       doc.setFont("times", "bold");
@@ -166,62 +172,79 @@ const AnalysisResults = ({ data, beforeImage, afterImage, analysisTimestamp, bef
       y += 5;
 
       // Explanations
-      doc.setFontSize(8);
-      doc.setTextColor(80, 80, 80);
       if (data.beforeExplanations?.[cat.key]) {
-        const bLines = doc.splitTextToSize(`Before: ${data.beforeExplanations[cat.key]}`, pageWidth - 35);
-        doc.text(bLines, 18, y);
-        y += bLines.length * 3.5 + 1;
+        addParagraph(`Before: ${data.beforeExplanations[cat.key]}`, 8, "normal", [100, 100, 100], 18, 3.5);
+        y += 1;
       }
       if (data.afterExplanations?.[cat.key]) {
-        const aLines = doc.splitTextToSize(`After: ${data.afterExplanations[cat.key]}`, pageWidth - 35);
-        doc.text(aLines, 18, y);
-        y += aLines.length * 3.5 + 1;
+        addParagraph(`After: ${data.afterExplanations[cat.key]}`, 8, "normal", [100, 100, 100], 18, 3.5);
+        y += 1;
       }
-      y += 4;
+      y += 2;
     });
 
+    checkPage(15);
     y += 3;
     doc.setFont("times", "bold");
     doc.setFontSize(11);
     doc.setTextColor(40, 40, 40);
-    doc.text(`Overall: ${avgBefore}% → ${avgAfter}% (+${avgAfter - avgBefore}%)`, 15, y);
+    doc.text(`Overall Score: ${avgBefore}% → ${avgAfter}% (+${avgAfter - avgBefore}%)`, 15, y);
     y += 12;
 
     // Recommendations
-    if (y > 240) {doc.addPage();y = 20;}
+    checkPage(20);
     doc.setFont("times", "bold");
     doc.setFontSize(13);
     doc.setTextColor(40, 40, 40);
     doc.text("Recommendations", 15, y);
     y += 8;
-    doc.setFont("times", "normal");
-    doc.setFontSize(10);
-    doc.setTextColor(60, 60, 60);
     data.recommendations.forEach((rec) => {
-      if (y > 270) {doc.addPage();y = 20;}
-      const lines = doc.splitTextToSize(`• ${rec}`, pageWidth - 30);
-      doc.text(lines, 15, y);
-      y += lines.length * 5 + 2;
+      addParagraph(`• ${rec}`, 10, "normal", [60, 60, 60], 15, 5);
+      y += 2;
     });
 
     // Improvements
     if (data.improvements.length > 0) {
-      y += 8;
-      if (y > 240) {doc.addPage();y = 20;}
+      y += 4;
+      checkPage(20);
       doc.setFont("helvetica", "bold");
       doc.setFontSize(13);
       doc.setTextColor(40, 40, 40);
       doc.text("Key Improvements Observed", 15, y);
       y += 8;
-      doc.setFont("helvetica", "normal");
-      doc.setFontSize(10);
-      doc.setTextColor(60, 60, 60);
       data.improvements.forEach((imp) => {
-        if (y > 270) {doc.addPage();y = 20;}
-        const lines = doc.splitTextToSize(`• ${imp}`, pageWidth - 30);
-        doc.text(lines, 15, y);
-        y += lines.length * 5 + 2;
+        addParagraph(`• ${imp}`, 10, "normal", [60, 60, 60], 15, 5);
+        y += 2;
+      });
+    }
+
+    // Root Cause Observations
+    if (data.rootCauseObservations && data.rootCauseObservations.length > 0) {
+      y += 4;
+      checkPage(20);
+      doc.setFont("times", "bold");
+      doc.setFontSize(13);
+      doc.setTextColor(40, 40, 40);
+      doc.text("Root Cause Observations", 15, y);
+      y += 8;
+      data.rootCauseObservations.forEach((obs) => {
+        addParagraph(`• ${obs}`, 10, "normal", [60, 60, 60], 15, 5);
+        y += 2;
+      });
+    }
+
+    // Safety Recommendations
+    if (data.safetyRecommendations && data.safetyRecommendations.length > 0) {
+      y += 4;
+      checkPage(20);
+      doc.setFont("times", "bold");
+      doc.setFontSize(13);
+      doc.setTextColor(40, 40, 40);
+      doc.text("Safety Compliance Recommendations", 15, y);
+      y += 8;
+      data.safetyRecommendations.forEach((sec) => {
+        addParagraph(`• ${sec}`, 10, "normal", [60, 60, 60], 15, 5);
+        y += 2;
       });
     }
 
@@ -326,62 +349,36 @@ const AnalysisResults = ({ data, beforeImage, afterImage, analysisTimestamp, bef
         </div>
       </div>
 
-      {/* 5S Scores with Explanations */}
+      {/* Before/After Comparison Slider */}
+      <div className="bg-card rounded-xl border border-border p-6 sm:p-8">
+        <h3 className="text-lg font-heading font-semibold text-card-foreground mb-4 flex items-center gap-2">
+          <TrendingUp className="h-5 w-5 text-primary" />
+          Before vs After Comparison
+        </h3>
+        <BeforeAfterComparison
+          beforeImage={beforeImage}
+          afterImage={afterImage}
+          beforeScore={avgBefore}
+          afterScore={avgAfter}
+        />
+      </div>
+
+      {/* 5S Scores with expandable explanation cards */}
       <div className="bg-card rounded-xl border border-border p-6 sm:p-8">
         <h3 className="text-lg font-heading font-semibold text-card-foreground mb-6">5S Category Scores</h3>
-        <div className="space-y-6">
-          {categories.map((cat) => {
-            const before = data.beforeScores[cat.key];
-            const after = data.afterScores[cat.key];
-            const beforeExp = data.beforeExplanations?.[cat.key];
-            const afterExp = data.afterExplanations?.[cat.key];
-            return (
-              <div key={cat.key} className="space-y-2">
-                <div className="flex justify-between items-start">
-                  <div>
-                    <span className="text-sm font-semibold text-foreground">{cat.label}</span>
-                    
-                    <p className="text-xs text-muted-foreground">{cat.desc}</p>
-                  </div>
-                  <span className="text-sm font-bold text-primary">+{after - before}%</span>
-                </div>
-                <div className="grid grid-cols-2 gap-3">
-                  <div>
-                    <div className="flex justify-between text-xs mb-1">
-                      <span className="text-muted-foreground">Before</span>
-                      <span className={getScoreColor(before)}>{before}%</span>
-                    </div>
-                    <div className="h-2.5 bg-muted rounded-full overflow-hidden">
-                      <div className={`h-full rounded-full ${getBarBg(before)}`} style={{ width: `${before}%` }} />
-                    </div>
-                    {beforeExp &&
-                    <div className="mt-1.5 flex items-start gap-1.5">
-                      <span className="text-primary text-xs flex-shrink-0 mt-0.5">•</span>
-                      <p className="text-xs text-muted-foreground leading-relaxed italic">{beforeExp}</p>
-                    </div>
-                    }
-                  </div>
-                  <div>
-                    <div className="flex justify-between text-xs mb-1">
-                      <span className="text-muted-foreground">After</span>
-                      <span className={getScoreColor(after)}>{after}%</span>
-                    </div>
-                    <div className="h-2.5 bg-muted rounded-full overflow-hidden">
-                      <div className={`h-full rounded-full ${getBarBg(after)}`} style={{ width: `${after}%` }} />
-                    </div>
-                    {afterExp &&
-                    <div className="mt-1.5 flex items-start gap-1.5">
-                      <span className="text-primary text-xs flex-shrink-0 mt-0.5">•</span>
-                      <p className="text-xs text-muted-foreground leading-relaxed italic">{afterExp}</p>
-                    </div>
-                    }
-                  </div>
-                </div>
-              </div>);
-
-          })}
+        <div className="space-y-3">
+          {PILLAR_META.map((pillar) => (
+            <ScoreExplanationCard
+              key={pillar.key}
+              pillar={pillar}
+              beforeScore={data.beforeScores[pillar.key]}
+              afterScore={data.afterScores[pillar.key]}
+              beforeExplanation={data.beforeExplanations?.[pillar.key]}
+              afterExplanation={data.afterExplanations?.[pillar.key]}
+              defaultExpanded={false}
+            />
+          ))}
         </div>
-
         <div className="mt-6 pt-6 border-t border-border flex items-center justify-between">
           <span className="font-heading font-semibold text-foreground">Overall Score</span>
           <div className="flex items-center gap-3">
@@ -391,6 +388,45 @@ const AnalysisResults = ({ data, beforeImage, afterImage, analysisTimestamp, bef
           </div>
         </div>
       </div>
+
+      {/* CV Metrics Panel (only shown when available) */}
+      {(data.beforeMetrics || data.afterMetrics) && (
+        <div className="bg-card rounded-xl border border-border p-6 sm:p-8">
+          <h3 className="text-lg font-heading font-semibold text-card-foreground mb-4 flex items-center gap-2">
+            <BarChart3 className="h-5 w-5 text-primary" />
+            Raw CV Metrics
+          </h3>
+          <p className="text-xs text-muted-foreground mb-4">
+            Intermediate metrics from the YOLOv8 + OpenCV engine that determined the scores above.
+          </p>
+          <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
+            {[
+              { label: "Clutter Objects", before: data.beforeMetrics?.clutter_count, after: data.afterMetrics?.clutter_count, lowerIsBetter: true },
+              { label: "Alignment Score", before: data.beforeMetrics?.alignment_score !== undefined ? `${(data.beforeMetrics.alignment_score * 100).toFixed(0)}%` : undefined, after: data.afterMetrics?.alignment_score !== undefined ? `${(data.afterMetrics.alignment_score * 100).toFixed(0)}%` : undefined },
+              { label: "Brightness", before: data.beforeMetrics?.brightness_mean?.toFixed(0), after: data.afterMetrics?.brightness_mean?.toFixed(0) },
+              { label: "Dirt Blobs", before: data.beforeMetrics?.dirt_proxy_count, after: data.afterMetrics?.dirt_proxy_count, lowerIsBetter: true },
+              { label: "Color Uniformity", before: data.beforeMetrics?.color_uniformity !== undefined ? `${(data.beforeMetrics.color_uniformity * 100).toFixed(0)}%` : undefined, after: data.afterMetrics?.color_uniformity !== undefined ? `${(data.afterMetrics.color_uniformity * 100).toFixed(0)}%` : undefined },
+              { label: "Objects Detected", before: data.beforeMetrics?.object_count, after: data.afterMetrics?.object_count },
+            ]
+              .filter((m) => m.before !== undefined || m.after !== undefined)
+              .map((metric) => (
+                <div key={metric.label} className="bg-muted/40 rounded-lg p-3 border border-border">
+                  <p className="text-[10px] text-muted-foreground uppercase tracking-wide mb-1.5">{metric.label}</p>
+                  <div className="flex items-center gap-2">
+                    <span className="text-sm text-muted-foreground">{metric.before ?? "—"}</span>
+                    <span className="text-muted-foreground text-xs">→</span>
+                    <span className="text-sm font-semibold text-foreground">{metric.after ?? "—"}</span>
+                  </div>
+                </div>
+              ))}
+          </div>
+          {data.scoringMethod && (
+            <p className="text-[10px] text-muted-foreground mt-4 pt-3 border-t border-border">
+              <span className="font-semibold">Scoring engine:</span> {data.scoringMethod}
+            </p>
+          )}
+        </div>
+      )}
 
       {/* Recommendations */}
       <div className="bg-card rounded-xl border border-border p-6 sm:p-8">
@@ -425,6 +461,48 @@ const AnalysisResults = ({ data, beforeImage, afterImage, analysisTimestamp, bef
           </ul>
         </div>
       }
+
+      {/* Root Cause Observations */}
+      {data.rootCauseObservations && data.rootCauseObservations.length > 0 && (
+        <div className="bg-card rounded-xl border border-border p-6 sm:p-8">
+          <h3 className="text-lg font-heading font-semibold text-card-foreground mb-4 flex items-center gap-2">
+            <Search className="h-5 w-5 text-amber-500" />
+            Root Cause Observations
+          </h3>
+          <p className="text-xs text-muted-foreground mb-4">
+            Lean engineering analysis of underlying factors contributing to identified shop-floor wastes.
+          </p>
+          <ul className="space-y-3">
+            {data.rootCauseObservations.map((obs, i) => (
+              <li key={i} className="flex items-start gap-3 text-sm text-muted-foreground">
+                <span className="mt-0.5 flex-shrink-0 w-5 h-5 rounded-full bg-amber-500/10 text-amber-500 text-xs flex items-center justify-center font-semibold">{i + 1}</span>
+                {obs}
+              </li>
+            ))}
+          </ul>
+        </div>
+      )}
+
+      {/* Safety Recommendations */}
+      {data.safetyRecommendations && data.safetyRecommendations.length > 0 && (
+        <div className="bg-card rounded-xl border border-border p-6 sm:p-8">
+          <h3 className="text-lg font-heading font-semibold text-card-foreground mb-4 flex items-center gap-2">
+            <ShieldCheck className="h-5 w-5 text-emerald-500" />
+            Safety Compliance Recommendations
+          </h3>
+          <p className="text-xs text-muted-foreground mb-4">
+            Critical safety measures aligned with occupational standards to eliminate occupational hazards in the Gemba.
+          </p>
+          <ul className="space-y-3">
+            {data.safetyRecommendations.map((sec, i) => (
+              <li key={i} className="flex items-start gap-3 text-sm text-muted-foreground">
+                <span className="mt-0.5 flex-shrink-0 w-5 h-5 rounded-full bg-emerald-500/10 text-emerald-500 text-xs flex items-center justify-center font-semibold">{i + 1}</span>
+                {sec}
+              </li>
+            ))}
+          </ul>
+        </div>
+      )}
 
       {/* Download */}
       <button

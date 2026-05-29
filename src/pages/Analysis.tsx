@@ -1,9 +1,10 @@
-import { useState, useCallback } from "react";
+import { useState, useCallback, useEffect } from "react";
 import Navbar from "@/components/Navbar";
 import Footer from "@/components/Footer";
 import ImageUploader, { GeoMeta } from "@/components/ImageUploader";
-import AnalysisResults, { AnalysisData } from "@/components/AnalysisResults";
-import { Loader2, Sparkles, User, BadgeCheck, Building2, MapPin, AlertTriangle } from "lucide-react";
+import AnalysisResults from "@/components/AnalysisResults";
+import AnalysisProgress from "@/components/AnalysisProgress";
+import { Loader2, Sparkles, User, BadgeCheck, Building2, MapPin, AlertTriangle, RotateCcw } from "lucide-react";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -14,6 +15,7 @@ import {
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/contexts/AuthContext";
+import { useAnalysisPipeline } from "@/hooks/useAnalysisPipeline";
 import arcolabLogoSrc from "@/assets/arcolab-logo.png";
 
 // Resize and compress image to a max dimension to speed up AI analysis
@@ -129,19 +131,15 @@ const applyWatermark = (raw: string, employeeName: string, employeeId: string, o
   });
 };
 
-// Simple in-memory cache: key = fingerprint of compressed images → analysis result
-const analysisCache = new Map<string, AnalysisData>();
-const fingerprintImages = (before: string, after: string): string =>
-  `${before.slice(-300)}__${after.slice(-300)}`;
+
 
 const Analysis = () => {
   const [beforeImage, setBeforeImage] = useState<string | null>(null);
   const [afterImage, setAfterImage] = useState<string | null>(null);
+  const [rawBefore, setRawBefore] = useState<string | null>(null);
+  const [rawAfter, setRawAfter] = useState<string | null>(null);
   const [beforeGeo, setBeforeGeo] = useState<GeoMeta | null>(null);
   const [afterGeo, setAfterGeo] = useState<GeoMeta | null>(null);
-  const [loading, setLoading] = useState(false);
-  const [results, setResults] = useState<AnalysisData | null>(null);
-  const [analysisTimestamp, setAnalysisTimestamp] = useState<string | null>(null);
   const [beforeUploadTime, setBeforeUploadTime] = useState<string | null>(null);
   const [afterUploadTime, setAfterUploadTime] = useState<string | null>(null);
   const [geoError, setGeoError] = useState<string | null>(null);
@@ -152,14 +150,35 @@ const Analysis = () => {
   const ZONES = ["Production", "Warehouse", "Quality Control", "Packaging", "Office Area", "Maintenance"];
 
   const officeName = office?.name ?? "Unknown Office";
+  const { pipeline, results, analysisTimestamp, runAnalysis, reset } = useAnalysisPipeline(officeName);
+  const loading = pipeline.stage !== "idle" && pipeline.stage !== "complete" && pipeline.stage !== "error";
 
   const handleGeoDenied = useCallback(() => {
     setGeoError("Location access is required for 5S audit compliance. Please enable location permissions and try again.");
   }, []);
 
-  const handleBeforeImage = useCallback(async (img: string | null, geo?: GeoMeta | null) => {
-    if (!img) {
+  // Dynamically apply / update watermark when raw images, zone, or auth details change
+  useEffect(() => {
+    if (rawBefore) {
+      applyWatermark(rawBefore, employee?.name ?? "Employee", employee?.employeeId ?? "", officeName, selectedZone)
+        .then(setBeforeImage);
+    } else {
       setBeforeImage(null);
+    }
+  }, [rawBefore, selectedZone, employee, officeName]);
+
+  useEffect(() => {
+    if (rawAfter) {
+      applyWatermark(rawAfter, employee?.name ?? "Employee", employee?.employeeId ?? "", officeName, selectedZone)
+        .then(setAfterImage);
+    } else {
+      setAfterImage(null);
+    }
+  }, [rawAfter, selectedZone, employee, officeName]);
+
+  const handleBeforeImage = useCallback((img: string | null, geo?: GeoMeta | null) => {
+    if (!img) {
+      setRawBefore(null);
       setBeforeUploadTime(null);
       setBeforeGeo(null);
       return;
@@ -172,13 +191,12 @@ const Analysis = () => {
     setGeoError(null);
     setBeforeUploadTime(geo?.capturedAt ?? new Date().toISOString());
     if (geo) setBeforeGeo(geo);
-    const watermarked = await applyWatermark(img, employee?.name ?? "Employee", employee?.employeeId ?? "", officeName, selectedZone);
-    setBeforeImage(watermarked);
-  }, [employee, officeName, selectedZone]);
+    setRawBefore(img);
+  }, []);
 
-  const handleAfterImage = useCallback(async (img: string | null, geo?: GeoMeta | null) => {
+  const handleAfterImage = useCallback((img: string | null, geo?: GeoMeta | null) => {
     if (!img) {
-      setAfterImage(null);
+      setRawAfter(null);
       setAfterUploadTime(null);
       setAfterGeo(null);
       return;
@@ -190,81 +208,15 @@ const Analysis = () => {
     setGeoError(null);
     setAfterUploadTime(geo?.capturedAt ?? new Date().toISOString());
     if (geo) setAfterGeo(geo);
-    const watermarked = await applyWatermark(img, employee?.name ?? "Employee", employee?.employeeId ?? "", officeName, selectedZone);
-    setAfterImage(watermarked);
-  }, [employee, officeName, selectedZone]);
+    setRawAfter(img);
+  }, []);
 
-  const runAnalysis = async () => {
+  const handleRunAnalysis = async () => {
     if (!beforeImage || !afterImage) {
       toast({ title: "Please upload both images", description: "Upload a before and after image to run the analysis.", variant: "destructive" });
       return;
     }
-
-    setLoading(true);
-    setResults(null);
-
-    try {
-      const [compBefore, compAfter] = await Promise.all([
-        resizeImage(beforeImage, 1024),
-        resizeImage(afterImage, 1024),
-      ]);
-
-      const cacheKey = fingerprintImages(compBefore, compAfter);
-      const cached = analysisCache.get(cacheKey);
-      if (cached) {
-        setResults(cached as AnalysisData);
-        setAnalysisTimestamp(new Date().toISOString());
-        setLoading(false);
-        return;
-      }
-
-      const { data, error } = await supabase.functions.invoke("analyze-5s", {
-        body: { beforeImage: compBefore, afterImage: compAfter },
-      });
-
-      if (error) throw error;
-      if (data?.error) throw new Error(data.error);
-
-      analysisCache.set(cacheKey, data);
-
-      setResults(data as AnalysisData);
-      const ts = new Date().toISOString();
-      setAnalysisTimestamp(ts);
-
-      // Save analysis log with geo metadata (fire-and-forget)
-      if (employee) {
-        supabase.functions.invoke("save-analysis-log", {
-          body: {
-            employeeId: employee.employeeId,
-            employeeName: employee.name,
-            department: employee.department,
-            officeName,
-            beforeImage: beforeImage,
-            afterImage: afterImage,
-            analysisResult: data,
-            scoringMethod: data?.scoringMethod ?? "gemini-fallback",
-            cvMetrics: data?.beforeMetrics && data?.afterMetrics
-              ? { before: data.beforeMetrics, after: data.afterMetrics }
-              : null,
-            // Geo metadata for audit trail
-            beforeGeo: beforeGeo ?? null,
-            afterGeo: afterGeo ?? null,
-            capturedAt: ts,
-          },
-        }).catch((logErr) => {
-          console.error("Failed to save analysis log:", logErr);
-        });
-      }
-    } catch (err: unknown) {
-      console.error("Analysis error:", err);
-      toast({
-        title: "Analysis Failed",
-        description: err instanceof Error ? err.message : "Something went wrong. Please try again.",
-        variant: "destructive",
-      });
-    } finally {
-      setLoading(false);
-    }
+    await runAnalysis(beforeImage, afterImage, beforeGeo, afterGeo);
   };
 
   // Disable Run button if location has been denied and there are no images already attached
@@ -394,24 +346,59 @@ const Analysis = () => {
               />
             </div>
 
-            {/* Run button — disabled if geo denied and no images yet */}
-            <button
-              onClick={runAnalysis}
-              disabled={loading || !beforeImage || !afterImage || isGeoDenied}
-              className="w-full flex items-center justify-center gap-2 rounded-md bg-primary px-6 py-3.5 text-base font-semibold text-primary-foreground hover:bg-primary/90 transition-colors shadow-sm disabled:opacity-50 disabled:cursor-not-allowed mb-10"
-            >
-              {loading ? (
-                <>
-                  <Loader2 className="h-5 w-5 animate-spin" />
-                  Analyzing workspace...
-                </>
-              ) : (
-                <>
-                  <Sparkles className="h-5 w-5" />
-                  Run 5S Analysis
-                </>
+            {/* Progress indicator */}
+            <AnalysisProgress pipeline={pipeline} />
+
+            {/* Error UI Alert Card */}
+            {pipeline.stage === "error" && (
+              <div className="bg-destructive/10 border border-destructive/20 rounded-xl p-6 text-center mb-8 shadow-sm animate-fade-in">
+                <AlertTriangle className="h-10 w-10 text-destructive mx-auto mb-3" />
+                <h3 className="text-lg font-bold text-foreground mb-2">Analysis Failed</h3>
+                <p className="text-sm font-medium text-destructive max-w-md mx-auto mb-6">
+                  {pipeline.message}
+                </p>
+                <button
+                  onClick={handleRunAnalysis}
+                  className="inline-flex items-center justify-center gap-2 rounded-md bg-destructive px-5 py-2.5 text-sm font-semibold text-white hover:bg-destructive/90 transition-colors shadow-sm"
+                >
+                  <Sparkles className="h-4 w-4" />
+                  Retry Analysis
+                </button>
+              </div>
+            )}
+
+            {/* Run / Reset button row */}
+            <div className="flex gap-3 mb-10">
+              <button
+                onClick={handleRunAnalysis}
+                disabled={loading || !beforeImage || !afterImage || isGeoDenied}
+                className="flex-1 flex items-center justify-center gap-2 rounded-md bg-primary px-6 py-3.5 text-base font-semibold text-primary-foreground hover:bg-primary/90 transition-colors shadow-sm disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                {loading ? (
+                  <>
+                    <Loader2 className="h-5 w-5 animate-spin" />
+                    {pipeline.message || "Analyzing workspace…"}
+                  </>
+                ) : (
+                  <>
+                    <Sparkles className="h-5 w-5" />
+                    Run 5S Analysis
+                  </>
+                )}
+              </button>
+              {results && (
+                <button
+                  onClick={() => {
+                    reset();
+                  }}
+                  title="Clear results and start over"
+                  className="flex items-center justify-center gap-2 rounded-md border border-border px-4 py-3.5 text-sm font-medium text-muted-foreground hover:text-foreground hover:border-foreground/30 transition-colors"
+                >
+                  <RotateCcw className="h-4 w-4" />
+                  Reset
+                </button>
               )}
-            </button>
+            </div>
 
             {/* Results */}
             {results && beforeImage && afterImage && (

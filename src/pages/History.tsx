@@ -52,12 +52,32 @@ const HistoryRow = ({ log }: { log: AnalysisLog }) => {
     setExpanded(willExpand);
     if (willExpand && !images && !imgLoading) {
       setImgLoading(true);
-      const { data } = await supabase
+            const { data } = await supabase
         .from("analysis_logs")
-        .select("before_image, after_image")
+        .select("before_image, after_image, before_image_path, after_image_path")
         .eq("id", log.id)
         .single();
-      if (data) setImages(data);
+      if (data) {
+        let beforeUrl = data.before_image_path || data.before_image;
+        let afterUrl = data.after_image_path || data.after_image;
+
+        // Check if image paths are stored as relative private paths inside '5s-images' bucket
+        if (beforeUrl && !beforeUrl.startsWith("data:") && !beforeUrl.startsWith("http")) {
+          const { data: bData } = await supabase.storage
+            .from("5s-images")
+            .createSignedUrl(beforeUrl, 3600);
+          if (bData) beforeUrl = bData.signedUrl;
+        }
+
+        if (afterUrl && !afterUrl.startsWith("data:") && !afterUrl.startsWith("http")) {
+          const { data: aData } = await supabase.storage
+            .from("5s-images")
+            .createSignedUrl(afterUrl, 3600);
+          if (aData) afterUrl = aData.signedUrl;
+        }
+
+        setImages({ before_image: beforeUrl, after_image: afterUrl });
+      }
       setImgLoading(false);
     }
   };
@@ -182,33 +202,43 @@ const History = () => {
   const [dateFilter, setDateFilter] = useState("");
 
   useEffect(() => {
-    const fetchLogs = async () => {
-      setLoading(true);
-      // Exclude heavy base64 image columns for fast list loading
-      const { data, error } = await supabase
-        .from("analysis_logs")
-        .select("id, employee_name, employee_id, department, analysis_date, analysis_result")
-        .order("analysis_date", { ascending: false })
-        .limit(100);
-      if (!error && data) setLogs(data as AnalysisLog[]);
-      setLoading(false);
-    };
-    fetchLogs();
-  }, []);
+    const handler = setTimeout(() => {
+      const fetchLogs = async () => {
+        setLoading(true);
+        let query = supabase
+          .from("analysis_logs")
+          .select("id, employee_name, employee_id, department, analysis_date, analysis_result")
+          .order("analysis_date", { ascending: false })
+          .limit(100);
 
-  const filtered = logs.filter((log) => {
-    const matchSearch =
-      !search ||
-      log.employee_name.toLowerCase().includes(search.toLowerCase()) ||
-      log.employee_id.toLowerCase().includes(search.toLowerCase()) ||
-      log.department.toLowerCase().includes(search.toLowerCase());
+        if (search.trim()) {
+          const s = search.trim();
+          query = query.or(`employee_name.ilike.%${s}%,employee_id.ilike.%${s}%,department.ilike.%${s}%`);
+        }
 
-    const matchDate =
-      !dateFilter ||
-      log.analysis_date.startsWith(dateFilter);
+        if (dateFilter) {
+          const [year, month, day] = dateFilter.split("-").map(Number);
+          const startOfDay = new Date(year, month - 1, day, 0, 0, 0, 0);
+          const endOfDay = new Date(year, month - 1, day, 23, 59, 59, 999);
+          
+          query = query
+            .gte("analysis_date", startOfDay.toISOString())
+            .lte("analysis_date", endOfDay.toISOString());
+        }
 
-    return matchSearch && matchDate;
-  });
+        const { data, error } = await query;
+        if (!error && data) {
+          setLogs(data as AnalysisLog[]);
+        }
+        setLoading(false);
+      };
+      fetchLogs();
+    }, 300);
+
+    return () => clearTimeout(handler);
+  }, [search, dateFilter]);
+
+  const filtered = logs;
 
   return (
     <div className="min-h-screen flex flex-col">

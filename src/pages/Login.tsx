@@ -26,50 +26,36 @@ const Login = () => {
     }
 
     setLoading(true);
-    
-    // Fallback employees list in case network fails
-    const EMPLOYEES = [
-      { employeeId: "ARC100", name: "Shankar R", department: "Operational Excellence", password: "ARCOLAB100" },
-      { employeeId: "ARC101", name: "Naveen SV", department: "Operational Excellence", password: "ARCOLAB101" }
-    ];
-
     try {
-      try {
-        const { data, error: fnError } = await supabase.functions.invoke("employee-login", {
-          body: { employeeId: employeeId.trim(), password: password.trim() },
-        });
+      const { data, error: fnError } = await supabase.functions.invoke("employee-login", {
+        body: { employeeId: employeeId.trim(), password: password.trim() },
+      });
 
-        if (fnError) throw fnError;
-        if (data?.error) {
-          setError(data.error);
-          setLoading(false);
-          return;
-        }
-
-        login(data.employee);
-        navigate("/analysis");
+      if (fnError) {
+        console.error("Authentication Edge Function error:", fnError);
+        setError(fnError.message || "Invalid Employee ID or Password");
+        setLoading(false);
         return;
-      } catch (networkError) {
-        console.warn("Edge function failed, falling back to local validation:", networkError);
-        
-        const employee = EMPLOYEES.find(
-          (e) => e.employeeId === employeeId.trim() && e.password === password.trim()
-        );
-
-        if (employee) {
-          login({
-            employeeId: employee.employeeId,
-            name: employee.name,
-            department: employee.department
-          });
-          navigate("/analysis");
-        } else {
-          setError("Invalid Employee ID or Password");
-        }
       }
+
+      if (data?.error) {
+        setError(data.error);
+        setLoading(false);
+        return;
+      }
+
+      await login(data.employee, data.session);
+
+      if (data.employee?.office_id) {
+        navigate("/analysis");
+      } else {
+        navigate("/select-office");
+      }
+      return;
     } catch (err: unknown) {
-      console.error("Login catch error:", err);
-      setError("Invalid Employee ID or Password");
+      console.error("Login unexpected error:", err);
+      const errMsg = err instanceof Error ? err.message : "Invalid Employee ID or Password";
+      setError(errMsg);
     } finally {
       setLoading(false);
     }

@@ -389,8 +389,8 @@ const AnalysisResults = ({ data, beforeImage, afterImage, analysisTimestamp, bef
         </div>
       </div>
 
-      {/* CV Metrics Panel (only shown when available) */}
-      {(data.beforeMetrics || data.afterMetrics) && (
+      {/* CV Metrics Panel (hidden) */}
+      {false && (data.beforeMetrics || data.afterMetrics) && (
         <div className="bg-card rounded-xl border border-border p-6 sm:p-8">
           <h3 className="text-lg font-heading font-semibold text-card-foreground mb-4 flex items-center gap-2">
             <BarChart3 className="h-5 w-5 text-primary" />

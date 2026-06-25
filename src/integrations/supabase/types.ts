@@ -16,37 +16,100 @@ export type Database = {
     Tables: {
       analysis_logs: {
         Row: {
-          after_image: string | null
-          analysis_date: string
-          analysis_result: Json | null
-          before_image: string | null
-          created_at: string
-          department: string
+          id: string
           employee_id: string
           employee_name: string
-          id: string
+          department: string
+          analysis_date: string
+          created_at: string
+          before_image: string | null
+          after_image: string | null
+          analysis_result: Json | null
+          // columns added by add_storage_bucket_and_cv_columns migration
+          before_image_path: string | null
+          after_image_path: string | null
+          scoring_method: string | null
+          cv_metrics: Json | null
+          // columns added by add_geotag_columns migration
+          office_name: string | null
+          before_latitude: number | null
+          before_longitude: number | null
+          before_captured_at: string | null
+          after_latitude: number | null
+          after_longitude: number | null
+          after_captured_at: string | null
+          captured_at: string | null
+          // columns added by production_database_architecture migration
+          worker_id: string | null
+          area_id: string | null
+          overall_score_before: number | null
+          overall_score_after: number | null
+          lean_maintenance_score: number | null
+          upload_status: string | null
+          retry_count: number | null
+          upload_error: string | null
         }
         Insert: {
-          after_image?: string | null
-          analysis_date?: string
-          analysis_result?: Json | null
-          before_image?: string | null
-          created_at?: string
-          department: string
+          id?: string
           employee_id: string
           employee_name: string
-          id?: string
+          department: string
+          analysis_date?: string
+          created_at?: string
+          before_image?: string | null
+          after_image?: string | null
+          analysis_result?: Json | null
+          before_image_path?: string | null
+          after_image_path?: string | null
+          scoring_method?: string | null
+          cv_metrics?: Json | null
+          office_name?: string | null
+          before_latitude?: number | null
+          before_longitude?: number | null
+          before_captured_at?: string | null
+          after_latitude?: number | null
+          after_longitude?: number | null
+          after_captured_at?: string | null
+          captured_at?: string | null
+          worker_id?: string | null
+          area_id?: string | null
+          overall_score_before?: number | null
+          overall_score_after?: number | null
+          lean_maintenance_score?: number | null
+          upload_status?: string | null
+          retry_count?: number | null
+          upload_error?: string | null
         }
         Update: {
-          after_image?: string | null
-          analysis_date?: string
-          analysis_result?: Json | null
-          before_image?: string | null
-          created_at?: string
-          department?: string
+          id?: string
           employee_id?: string
           employee_name?: string
-          id?: string
+          department?: string
+          analysis_date?: string
+          created_at?: string
+          before_image?: string | null
+          after_image?: string | null
+          analysis_result?: Json | null
+          before_image_path?: string | null
+          after_image_path?: string | null
+          scoring_method?: string | null
+          cv_metrics?: Json | null
+          office_name?: string | null
+          before_latitude?: number | null
+          before_longitude?: number | null
+          before_captured_at?: string | null
+          after_latitude?: number | null
+          after_longitude?: number | null
+          after_captured_at?: string | null
+          captured_at?: string | null
+          worker_id?: string | null
+          area_id?: string | null
+          overall_score_before?: number | null
+          overall_score_after?: number | null
+          lean_maintenance_score?: number | null
+          upload_status?: string | null
+          retry_count?: number | null
+          upload_error?: string | null
         }
         Relationships: []
       }

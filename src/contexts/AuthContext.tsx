@@ -39,6 +39,7 @@ interface AuthContextType {
   login: (employee: Employee, session?: SupabaseSession | null) => Promise<void>;
   logout: () => Promise<void>;
   isAuthenticated: boolean;
+  isInitializing: boolean;
   setOfficeState: (office: Office) => void;
 }
 
@@ -48,6 +49,7 @@ const AuthContext = createContext<AuthContextType>({
   login: async () => {},
   logout: async () => {},
   isAuthenticated: false,
+  isInitializing: true,
   setOfficeState: () => {},
 });
 
@@ -63,6 +65,10 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     const stored = sessionStorage.getItem("arcolab_office");
     return stored ? JSON.parse(stored) : null;
   });
+
+  // True while waiting for the async Supabase session check on mount.
+  // ProtectedRoute must wait for this to be false before deciding to redirect.
+  const [isInitializing, setIsInitializing] = useState(true);
 
   useEffect(() => {
     const syncSession = async () => {
@@ -106,9 +112,17 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
               }
             }
           }
+        } else {
+          // No active Supabase session — clear any stale sessionStorage data
+          sessionStorage.removeItem("arcolab_employee");
+          sessionStorage.removeItem("arcolab_office");
+          setEmployee(null);
+          setOffice(null);
         }
       } catch (err) {
         console.error("Failed to sync session on mount:", err);
+      } finally {
+        setIsInitializing(false);
       }
     };
     syncSession();
@@ -184,6 +198,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         login,
         logout,
         isAuthenticated: !!employee,
+        isInitializing,
         setOfficeState,
       }}
     >

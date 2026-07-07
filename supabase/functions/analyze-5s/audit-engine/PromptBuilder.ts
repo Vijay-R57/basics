@@ -483,4 +483,75 @@ export class PromptBuilder {
       dimensionMap, emptyEvidence, [], {},
     );
   }
+
+  /**
+   * Helper to format the prompt strategy instructions for a single question.
+   * Used by the Calibration Studio live preview.
+   */
+  static buildSingleQuestionPrompt(
+    cfg: { questionId: string; questionType: number; evidenceCategory: string; decisionStrategy: string; forbiddenEvidence: string[] },
+    qerCfg: { evidenceIntent: string; inspectionProcedure: Array<{ step: number; action: string; condition?: string; expectedOutcome: string }> },
+    ecm: { requiredObjectTypes: string[]; primaryEvidence: string[]; supportingEvidence: string[]; forbiddenObjectTypes: string[] },
+    filtered?: { canVerify: boolean },
+    override?: string | null,
+  ): string {
+    const sectionKey   = STRATEGY_TO_SECTION[cfg.decisionStrategy];
+    const strategyText = sectionKey ? getPromptSection(sectionKey) : '';
+
+    const lines: string[] = [];
+    lines.push(`[${cfg.questionId}] — Type ${cfg.questionType} | Category ${cfg.evidenceCategory}`);
+    lines.push(`  Strategy: ${cfg.decisionStrategy}`);
+
+    if (strategyText) {
+      lines.push(`  ${strategyText.split('\n').join('\n  ')}`);
+    }
+
+    lines.push(`  Evidence Intent: ${qerCfg.evidenceIntent}`);
+    if (qerCfg.inspectionProcedure.length > 0) {
+      lines.push(`  INSPECTION PROCEDURE:`);
+      for (const step of qerCfg.inspectionProcedure) {
+        lines.push(`    Step ${step.step}: ${step.action}`);
+        if (step.condition) {
+          lines.push(`      → Condition: ${step.condition}`);
+        }
+        lines.push(`      → Expected outcome: ${step.expectedOutcome}`);
+      }
+    }
+
+    if (ecm.requiredObjectTypes.length > 0) {
+      lines.push(`  REQUIRED OBJECTS (must be visible to evaluate):`);
+      lines.push(`    ${ecm.requiredObjectTypes.join(', ')}`);
+      lines.push(`    If none of these are visible → return NOT_VISIBLE ("Cannot Verify")`);
+    }
+    if (ecm.primaryEvidence.length > 0) {
+      lines.push(`  PRIMARY EVIDENCE (weight 1.0 — use these for rating decisions):`);
+      lines.push(`    ${ecm.primaryEvidence.slice(0, 8).join(', ')}`);
+    }
+    if (ecm.supportingEvidence.length > 0) {
+      lines.push(`  SUPPORTING EVIDENCE (weight 0.7 — context only):`);
+      lines.push(`    ${ecm.supportingEvidence.slice(0, 6).join(', ')}`);
+    }
+    if (ecm.forbiddenObjectTypes.length > 0) {
+      lines.push(`  FORBIDDEN OBJECTS (must NOT influence this question's rating):`);
+      lines.push(`    ${ecm.forbiddenObjectTypes.slice(0, 8).join(', ')}`);
+    }
+
+    if (filtered && !filtered.canVerify) {
+      lines.push(`  ⚠ CANNOT VERIFY: No required objects found in filtered evidence.`);
+      lines.push(`    Return rating: NOT_VISIBLE. Do not assume compliance or non-compliance.`);
+    }
+
+    if (override) {
+      lines.push(`  ZONE OVERRIDE: ${override}`);
+    }
+
+    if (cfg.forbiddenEvidence.length > 0) {
+      lines.push(`  Forbidden evidence phrases for this question:`);
+      for (const fe of cfg.forbiddenEvidence) {
+        lines.push(`    - "${fe}"`);
+      }
+    }
+
+    return lines.join('\n');
+  }
 }

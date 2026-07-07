@@ -32,6 +32,7 @@ import type {
   FilteredEvidenceModel,
   ZoneKnowledge,
   AuditEvidenceModel,
+  EvidenceCapabilityEntry,
 } from './types.ts';
 import { EvidenceFilterService, threeStageMatch } from './EvidenceFilterService.ts';
 import { getEvidenceCapability }                   from './EvidenceCapabilityMatrix.ts';
@@ -97,6 +98,7 @@ export class EvidenceCoverageService {
     filteredOrEvidence: FilteredEvidenceModel | AuditEvidenceModel,
     knowledge:  ZoneKnowledge,
     rawEvidence?: AuditEvidenceModel,
+    customECM?: EvidenceCapabilityEntry,
   ): EvidenceCoverage {
     try {
       let filtered: FilteredEvidenceModel;
@@ -105,7 +107,7 @@ export class EvidenceCoverageService {
         filtered = filteredOrEvidence;
       } else {
         // Fallback for direct unit test invocations
-        filtered = EvidenceFilterService.filterForQuestion(questionId, filteredOrEvidence as AuditEvidenceModel);
+        filtered = EvidenceFilterService.filterForQuestion(questionId, filteredOrEvidence as AuditEvidenceModel, customECM);
         evidence = filteredOrEvidence as AuditEvidenceModel;
       }
 
@@ -140,7 +142,7 @@ export class EvidenceCoverageService {
       );
 
       // ── 4. Required, Primary, Supporting Coverage (R11.1) ──────────────────
-      const entry = getEvidenceCapability(questionId);
+      const entry = customECM ?? getEvidenceCapability(questionId);
 
       // Required Coverage: 1.0 if canVerify is true, otherwise 0.0
       const requiredCoverageRatio = canVerify ? 1.0 : 0.0;

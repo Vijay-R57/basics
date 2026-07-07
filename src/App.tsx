@@ -16,6 +16,7 @@ import NotFound from "./pages/NotFound";
 import OfficeSelection from "./pages/OfficeSelection";
 import History from "./pages/History";
 import AuditPage from "./modules/audit/pages/AuditPage";
+import CalibrationStudio from "./pages/CalibrationStudio";
 
 const queryClient = new QueryClient();
 
@@ -37,6 +38,7 @@ const App = () => (
             <Route path="/profile" element={<ProtectedRoute><Profile /></ProtectedRoute>} />
             <Route path="/history" element={<ProtectedRoute><History /></ProtectedRoute>} />
             <Route path="/audit" element={<ProtectedRoute><AuditPage /></ProtectedRoute>} />
+            <Route path="/calibration-studio" element={<CalibrationStudio />} />
             <Route path="*" element={<NotFound />} />
           </Routes>
         </BrowserRouter>

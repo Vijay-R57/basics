@@ -189,27 +189,32 @@ export class EvidenceFilterService {
   static filterForQuestion(
     questionId:  string,
     evidence:    AuditEvidenceModel,
+    customECM?:  EvidenceCapabilityEntry,
   ): FilteredEvidenceModel {
     let entry: EvidenceCapabilityEntry;
 
-    try {
-      entry = getEvidenceCapability(questionId);
-    } catch {
-      // ECM entry missing — fail safe: return empty model, cannot verify
-      return {
-        questionId,
-        allowedObjects:      [],
-        allowedPositive:     [],
-        allowedViolations:   [],
-        discardedObjects:    evidence.visibleObjects.length,
-        discardedViolations: evidence.violations.length,
-        canVerify:           false,
-        evidenceWeightScore: 0,
-        ecmVersion:          ECM_VERSION,
-        filteredObjects:     [],
-        discardedObjectsList: evidence.visibleObjects,
-        discardReasons:      evidence.visibleObjects.map(o => `ECM entry missing for question ${questionId}`),
-      };
+    if (customECM) {
+      entry = customECM;
+    } else {
+      try {
+        entry = getEvidenceCapability(questionId);
+      } catch {
+        // ECM entry missing — fail safe: return empty model, cannot verify
+        return {
+          questionId,
+          allowedObjects:      [],
+          allowedPositive:     [],
+          allowedViolations:   [],
+          discardedObjects:    evidence.visibleObjects.length,
+          discardedViolations: evidence.violations.length,
+          canVerify:           false,
+          evidenceWeightScore: 0,
+          ecmVersion:          ECM_VERSION,
+          filteredObjects:     [],
+          discardedObjectsList: evidence.visibleObjects,
+          discardReasons:      evidence.visibleObjects.map(o => `ECM entry missing for question ${questionId}`),
+        };
+      }
     }
 
     const { aliases } = EvidenceFilterService;

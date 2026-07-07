@@ -325,6 +325,12 @@ export interface EvidenceCoverage {
   contextCompleteness:    'FULL' | 'PARTIAL' | 'MINIMAL';
   coveragePercentage:     number;           // 0–100
   recommendedConfidence:  EvidenceConfidence;
+
+  // Added in R11.1
+  requiredCoverage?:          number; // 0–100
+  primaryEvidenceCoverage?:   number; // 0–100
+  supportingEvidenceCoverage?: number; // 0–100
+  capabilityScore?:           number; // 0–100
 }
 
 /** Per-question positive vs violation balance result */
@@ -573,6 +579,11 @@ export interface FilteredEvidenceModel {
   canVerify:            boolean;   // False if no required objects found
   evidenceWeightScore:  number;    // 0.0–1.0 weighted evidence quality
   ecmVersion:           string;
+
+  // Added in R11.1
+  filteredObjects?:     VisibleObject[];
+  discardedObjectsList?: VisibleObject[];
+  discardReasons?:      string[];
 }
 
 // ── R11: Recommendation Template (embedded in QER) ────────────────────────────
@@ -607,12 +618,22 @@ export interface RecommendationTemplate {
  * and one entry in EvidenceCapabilityMatrix.
  * No other files need modification.
  */
+export type EvidenceIntent =
+  | 'PRESENCE_DETECTION'
+  | 'ABSENCE_DETECTION'
+  | 'CONDITION_ASSESSMENT'
+  | 'ORGANIZATION_ASSESSMENT'
+  | 'CLEANLINESS_ASSESSMENT'
+  | 'DOCUMENTATION_PRESENCE'
+  | 'VISUAL_STANDARD_ASSESSMENT';
+
 export interface QuestionEvaluationConfig {
   // ── Identity ──────────────────────────────────────────────────────
   questionId:   string;
   questionText: string;
   pillar:       PillarKey;
   auditIntent:  string;          // Plain-English purpose of this question
+  evidenceIntent: EvidenceIntent; // R11.1: Intent of the evidence check
 
   // ── Decision Strategy (from former AuditDecisionMatrix) ───────────
   questionType:     1 | 2 | 3;

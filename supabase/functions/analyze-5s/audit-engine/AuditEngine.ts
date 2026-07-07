@@ -199,7 +199,7 @@ export class AuditEngine {
     const allCalibConfigs = getAllCalibrationConfigs();
     const pillarCalibConfigs = allCalibConfigs.filter((c) => questionIds.includes(c.questionId));
 
-    const coverages = EvidenceCoverageService.computeAll(questionIds, filteredMap, knowledge);
+    const coverages = EvidenceCoverageService.computeAll(questionIds, filteredMap, knowledge, evidence);
     const balances  = PositiveBalanceService.computeAll(questionIds, evidence, pillarCalibConfigs);
 
     // ── 6. Build Stage B prompt (with calibration summaries + ECM context) ─────
@@ -276,6 +276,7 @@ export class AuditEngine {
       coverages,
       balances,
       calibOverrides,
+      filteredMap,
     );
 
     return { result, metrics: collector.finalize(), coverages, balances, traces };

@@ -39,8 +39,10 @@ import type {
   ViolationObservation,
   AuditRating,
   DecisionStrategy,
+  FilteredEvidenceModel,
 } from './types.ts';
 import type { CalibrationOverride } from './CalibrationService.ts';
+import { EvidenceFilterService }     from './EvidenceFilterService.ts';
 
 // ── DecisionTrace ──────────────────────────────────────────────────────────────
 
@@ -70,6 +72,12 @@ export interface DecisionTrace {
   finalScore:              number;
   wasOverridden:           boolean;
   tracedAt:                string;
+
+  // Added in R11.1
+  allowedObjects?:      VisibleObject[];
+  filteredObjects?:     VisibleObject[];
+  discardedObjects?:    VisibleObject[];
+  discardReasons?:      string[];
 }
 
 // ── Dimension keyword map ─────────────────────────────────────────────────────
@@ -110,6 +118,7 @@ export class DecisionTraceService {
     coverage:      EvidenceCoverage | undefined,
     balance:       BalanceResult | undefined,
     overrides:     CalibrationOverride[],
+    filteredMap?:  Map<string, FilteredEvidenceModel>,
   ): DecisionTrace {
     const qId      = rawQuestion.questionId;
     const keywords = QUESTION_DIMENSIONS[qId] ?? [];
@@ -144,6 +153,9 @@ export class DecisionTraceService {
 
     const questionOverrides = overrides.filter((o) => o.questionId === qId);
 
+    // Resolve filtered model for trace
+    const filtered = filteredMap?.get(qId) || EvidenceFilterService.filterForQuestion(qId, evidence);
+
     return {
       questionId:               qId,
       question:                 rawQuestion.question,
@@ -166,6 +178,12 @@ export class DecisionTraceService {
       finalScore:              finalQuestion.score,
       wasOverridden:           questionOverrides.length > 0,
       tracedAt:                new Date().toISOString(),
+
+      // R11.1
+      allowedObjects:           filtered.allowedObjects,
+      filteredObjects:          filtered.filteredObjects ?? filtered.allowedObjects,
+      discardedObjects:         filtered.discardedObjectsList ?? [],
+      discardReasons:           filtered.discardReasons ?? [],
     };
   }
 
@@ -178,6 +196,7 @@ export class DecisionTraceService {
     coverages:      EvidenceCoverage[],
     balances:       BalanceResult[],
     overrides:      CalibrationOverride[],
+    filteredMap?:   Map<string, FilteredEvidenceModel>,
   ): Map<string, DecisionTrace> {
     const admMap      = new Map(admConfigs.map((c) => [c.questionId, c]));
     const calibMap    = new Map(calibConfigs.map((c) => [c.questionId, c]));
@@ -197,6 +216,7 @@ export class DecisionTraceService {
         coverageMap.get(raw.questionId),
         balanceMap.get(raw.questionId),
         overrides,
+        filteredMap,
       );
       traces.set(raw.questionId, trace);
     }

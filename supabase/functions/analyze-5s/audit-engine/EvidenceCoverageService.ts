@@ -33,7 +33,8 @@ import type {
   ZoneKnowledge,
   AuditEvidenceModel,
 } from './types.ts';
-import { EvidenceFilterService } from './EvidenceFilterService.ts';
+import { EvidenceFilterService, threeStageMatch } from './EvidenceFilterService.ts';
+import { getEvidenceCapability }                   from './EvidenceCapabilityMatrix.ts';
 
 // ── Scoring weights ────────────────────────────────────────────────────────────
 
@@ -53,17 +54,29 @@ export class EvidenceCoverageService {
    * @param knowledge                 - Zone knowledge (provides expectedObjectTypes count)
    * @returns                         - One EvidenceCoverage per question ID
    */
+  /**
+   * Computes EvidenceCoverage for every question using FilteredEvidenceModels or raw AuditEvidenceModel.
+   *
+   * @param questionIds               - All question IDs to compute coverage for
+   * @param filteredMapOrEvidence     - Map<questionId, FilteredEvidenceModel> or raw AuditEvidenceModel (backward compatibility)
+   * @param knowledge                 - Zone knowledge (provides expectedObjectTypes count)
+   * @param rawEvidence               - Raw AuditEvidenceModel (optional, provides unfiltered visible objects)
+   * @returns                         - One EvidenceCoverage per question ID
+   */
   static computeAll(
     questionIds:  string[],
     filteredMapOrEvidence:  Map<string, FilteredEvidenceModel> | AuditEvidenceModel,
     knowledge:    ZoneKnowledge,
+    rawEvidence?: AuditEvidenceModel,
   ): EvidenceCoverage[] {
     let map: Map<string, FilteredEvidenceModel>;
-    if (typeof (filteredMapOrEvidence as Record<string, unknown>).get === 'function') {
+    let evidence: AuditEvidenceModel | undefined = rawEvidence;
+    if (typeof (filteredMapOrEvidence as unknown as { get: unknown }).get === 'function') {
       map = filteredMapOrEvidence as Map<string, FilteredEvidenceModel>;
     } else {
       // Backward compatibility for unit tests: construct filtered map on the fly
       map = EvidenceFilterService.filterForAll(questionIds, filteredMapOrEvidence as AuditEvidenceModel);
+      evidence = filteredMapOrEvidence as AuditEvidenceModel;
     }
 
     return questionIds.map((qId) => {
@@ -71,7 +84,7 @@ export class EvidenceCoverageService {
       if (!filtered) {
         return EvidenceCoverageService._fallback(qId);
       }
-      return EvidenceCoverageService.computeForQuestion(qId, filtered, knowledge);
+      return EvidenceCoverageService.computeForQuestion(qId, filtered, knowledge, evidence);
     });
   }
 
@@ -83,17 +96,27 @@ export class EvidenceCoverageService {
     questionId: string,
     filteredOrEvidence: FilteredEvidenceModel | AuditEvidenceModel,
     knowledge:  ZoneKnowledge,
+    rawEvidence?: AuditEvidenceModel,
   ): EvidenceCoverage {
     try {
       let filtered: FilteredEvidenceModel;
+      let evidence: AuditEvidenceModel | undefined = rawEvidence;
       if (filteredOrEvidence && 'allowedObjects' in filteredOrEvidence) {
         filtered = filteredOrEvidence;
       } else {
         // Fallback for direct unit test invocations
         filtered = EvidenceFilterService.filterForQuestion(questionId, filteredOrEvidence as AuditEvidenceModel);
+        evidence = filteredOrEvidence as AuditEvidenceModel;
       }
 
       const { allowedObjects, allowedPositive, allowedViolations, evidenceWeightScore, canVerify } = filtered;
+
+      // Use raw visible objects for checking coverage; fallback to allowedObjects if unavailable
+      const coverageObjects = evidence?.visibleObjects ?? allowedObjects;
+
+      if (coverageObjects.length === 0) {
+        return EvidenceCoverageService._fallback(questionId);
+      }
 
       // ── 1. Quality score — DIRECT ratio of allowed objects ────────────────
       const directCount   = allowedObjects.filter((o) => o.observationType === 'DIRECT').length;
@@ -104,7 +127,10 @@ export class EvidenceCoverageService {
 
       // ── 2. Context score — ECM tier-weighted score ─────────────────────────
       // evidenceWeightScore is 0.0–1.0; scale to 0–100
-      const contextScore = Math.round(evidenceWeightScore * 100);
+      // Default to 100 if no allowedObjects are present (area is clean)
+      const contextScore = allowedObjects.length === 0
+        ? 100
+        : Math.round(evidenceWeightScore * 100);
 
       // ── 3. Expected object types ───────────────────────────────────────────
       const totalExpected = Math.max(1,
@@ -113,21 +139,40 @@ export class EvidenceCoverageService {
         knowledge.expectedLayout.length,
       );
 
-      // ── 4. Positive density score ──────────────────────────────────────────
-      const positiveScore = Math.min(100,
-        Math.round((allowedPositive.length / Math.max(1, totalExpected)) * 100),
-      );
+      // ── 4. Required, Primary, Supporting Coverage (R11.1) ──────────────────
+      const entry = getEvidenceCapability(questionId);
 
-      // ── 5. Weighted coverage percentage ───────────────────────────────────
-      const coveragePercentage = Math.round(
-        qualityScore  * W_QUALITY +
-        contextScore  * W_CONTEXT +
-        positiveScore * W_POSITIVE,
+      // Required Coverage: 1.0 if canVerify is true, otherwise 0.0
+      const requiredCoverageRatio = canVerify ? 1.0 : 0.0;
+
+      // Primary Coverage: 1.0 if any primary evidence item is visible in coverageObjects
+      const hasPrimary = entry.primaryEvidence.some((pri) =>
+        coverageObjects.some((obj) =>
+          threeStageMatch(obj.description, pri, entry.objectAliases),
+        ),
       );
+      const primaryEvidenceCoverageRatio = entry.primaryEvidence.length === 0 ? 1.0 : (hasPrimary ? 1.0 : 0.0);
+
+      // Supporting Coverage: 1.0 if any supporting evidence item is visible in coverageObjects
+      const hasSupporting = entry.supportingEvidence.some((sup) =>
+        coverageObjects.some((obj) =>
+          threeStageMatch(obj.description, sup, entry.objectAliases),
+        ),
+      );
+      const supportingEvidenceCoverageRatio = entry.supportingEvidence.length === 0 ? 1.0 : (hasSupporting ? 1.0 : 0.0);
+
+      // ── 5. Capability Score (0–100%) ──────────────────────────────────────
+      const capabilityScore = canVerify
+        ? Math.round(
+            (requiredCoverageRatio * 0.40 +
+             primaryEvidenceCoverageRatio * 0.40 +
+             supportingEvidenceCoverageRatio * 0.20) * 100
+          )
+        : 70; // Baseline for non-verifiable/non-applicable questions to prevent penalizing audit reliability
 
       // ── 6. Context completeness — driven by canVerify + context score ──────
       const contextCompleteness: 'FULL' | 'PARTIAL' | 'MINIMAL' =
-        !canVerify           ? 'MINIMAL' :
+        !canVerify           ? (allowedObjects.length === 0 ? 'FULL' : 'MINIMAL') :
         contextScore >= 80   ? 'FULL'    :
         contextScore >= 40   ? 'PARTIAL' :
         'MINIMAL';
@@ -138,10 +183,10 @@ export class EvidenceCoverageService {
         qualityScore >= 45 ? 'MEDIUM' :
         'LOW';
 
-      // ── 8. Recommended confidence ──────────────────────────────────────────
+      // ── 8. Recommended confidence derived from Capability Score (R11.1) ───
       const recommendedConfidence: EvidenceConfidence =
-        coveragePercentage >= 75 ? 'HIGH' :
-        coveragePercentage >= 45 ? 'MEDIUM' :
+        capabilityScore >= 75 ? 'HIGH' :
+        capabilityScore >= 45 ? 'MEDIUM' :
         'LOW';
 
       return {
@@ -152,8 +197,12 @@ export class EvidenceCoverageService {
         violationCount:        allowedViolations.length,
         evidenceQuality,
         contextCompleteness,
-        coveragePercentage,
+        coveragePercentage:     capabilityScore, // Derive from Capability Score
         recommendedConfidence,
+        requiredCoverage:          Math.round(requiredCoverageRatio * 100),
+        primaryEvidenceCoverage:   Math.round(primaryEvidenceCoverageRatio * 100),
+        supportingEvidenceCoverage: Math.round(supportingEvidenceCoverageRatio * 100),
+        capabilityScore,
       };
 
     } catch {
@@ -182,6 +231,10 @@ export class EvidenceCoverageService {
       contextCompleteness:   'MINIMAL',
       coveragePercentage:    30,
       recommendedConfidence: 'MEDIUM',
+      requiredCoverage:          100,
+      primaryEvidenceCoverage:   0,
+      supportingEvidenceCoverage: 0,
+      capabilityScore:           30,
     };
   }
 }

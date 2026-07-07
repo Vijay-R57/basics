@@ -118,7 +118,7 @@ function aliasMatch(
  * Three-stage match: returns true if `description` matches `canonical` via
  * Stage 1 (exact), Stage 2 (token), or Stage 3 (alias).
  */
-function threeStageMatch(
+export function threeStageMatch(
   description: string,
   canonical: string,
   aliases: Record<string, string[]>,
@@ -206,6 +206,9 @@ export class EvidenceFilterService {
         canVerify:           false,
         evidenceWeightScore: 0,
         ecmVersion:          ECM_VERSION,
+        filteredObjects:     [],
+        discardedObjectsList: evidence.visibleObjects,
+        discardReasons:      evidence.visibleObjects.map(o => `ECM entry missing for question ${questionId}`),
       };
     }
 
@@ -213,7 +216,9 @@ export class EvidenceFilterService {
 
     // ── Filter VisibleObjects ─────────────────────────────────────────────────
 
-    const allowedObjects:  VisibleObject[]       = [];
+    const allowedObjects:       VisibleObject[] = [];
+    const discardedObjectsList: VisibleObject[] = [];
+    const discardReasons:       string[]        = [];
     let   discardedObjects = 0;
 
     for (const obj of evidence.visibleObjects) {
@@ -222,6 +227,8 @@ export class EvidenceFilterService {
       // Reject: object is forbidden
       if (matchesAny(desc, entry.forbiddenObjectTypes, entry.objectAliases)) {
         discardedObjects++;
+        discardedObjectsList.push(obj);
+        discardReasons.push(`Object "${desc}" is explicitly forbidden for ${questionId}.`);
         continue;
       }
 
@@ -235,6 +242,11 @@ export class EvidenceFilterService {
         allowedObjects.push(obj);
       } else {
         discardedObjects++;
+        discardedObjectsList.push(obj);
+        discardReasons.push(
+          `Object "${desc}" (category ${obj.category}) is neither in allowed categories ` +
+          `[${entry.allowedCategories.join(', ')}] nor primary/supporting evidence for ${questionId}.`
+        );
       }
     }
 
@@ -280,7 +292,7 @@ export class EvidenceFilterService {
     const canVerify = entry.requiredObjectTypes.length === 0
       ? true   // Type 3 questions have no required objects
       : entry.requiredObjectTypes.some((req) =>
-          allowedObjects.some((obj) =>
+          evidence.visibleObjects.some((obj) =>
             threeStageMatch(obj.description, req, entry.objectAliases),
           ),
         );
@@ -298,7 +310,10 @@ export class EvidenceFilterService {
       discardedViolations,
       canVerify,
       evidenceWeightScore,
-      ecmVersion: ECM_VERSION,
+      ecmVersion:           ECM_VERSION,
+      filteredObjects:      allowedObjects,
+      discardedObjectsList,
+      discardReasons,
     };
   }
 

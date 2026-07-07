@@ -67,7 +67,7 @@ const MATRIX: EvidenceCapabilityEntry[] = [
     ],
     objectAliases: {
       'drum':      DRUM_ALIASES,
-      'container': ['bin', 'box', 'crate', 'tote', 'carton', 'package'],
+      'container': ['bin', 'box', 'crate', 'tote', 'carton', 'package', 'drum', 'barrel', ...DRUM_ALIASES],
       'document pile': ['paper stack', 'file pile', 'binder stack', 'loose papers'],
     },
     evidencePriority: [

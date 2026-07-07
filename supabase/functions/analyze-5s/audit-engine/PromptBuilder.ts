@@ -259,6 +259,7 @@ export class PromptBuilder {
       // ── Structured Inspection Procedure (R11 Refinement 2) ──────────────
       try {
         const qerCfg = getQuestionEvalConfig(cfg.questionId);
+        lines.push(`  Evidence Intent: ${qerCfg.evidenceIntent}`);
         if (qerCfg.inspectionProcedure.length > 0) {
           lines.push(`  INSPECTION PROCEDURE:`);
           for (const step of qerCfg.inspectionProcedure) {

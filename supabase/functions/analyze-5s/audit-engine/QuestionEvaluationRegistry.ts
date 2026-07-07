@@ -57,6 +57,7 @@ const REGISTRY: QuestionEvaluationConfig[] = [
     questionText: 'Is the workplace cluttered with unnecessary raw materials, drums, inventory, laboratory items, documents or finished products?',
     pillar:       'SORT',
     auditIntent:  'Identify whether non-essential items are occupying workspace that should be clear.',
+    evidenceIntent:    'ORGANIZATION_ASSESSMENT',
 
     questionType:     1,
     evidenceCategory: 'A',
@@ -114,6 +115,7 @@ const REGISTRY: QuestionEvaluationConfig[] = [
     questionText: 'Are unnecessary trays, tools, moulds, accessories or unused materials present?',
     pillar:       'SORT',
     auditIntent:  'Detect tools and accessories that are not actively used in the current work process.',
+    evidenceIntent:    'ORGANIZATION_ASSESSMENT',
 
     questionType:     2,
     evidenceCategory: 'B',
@@ -168,6 +170,7 @@ const REGISTRY: QuestionEvaluationConfig[] = [
     questionText: 'Are unused machines or unnecessary equipment occupying valuable workspace?',
     pillar:       'SORT',
     auditIntent:  'Determine if non-operational machines or equipment are consuming production space.',
+    evidenceIntent:    'ORGANIZATION_ASSESSMENT',
 
     questionType:     2,
     evidenceCategory: 'B',
@@ -220,6 +223,7 @@ const REGISTRY: QuestionEvaluationConfig[] = [
     questionText: 'Are obsolete instructions, documents or visual displays still present?',
     pillar:       'SORT',
     auditIntent:  'Detect outdated documents, instructions, or signs that could cause process confusion.',
+    evidenceIntent:    'CONDITION_ASSESSMENT',
 
     questionType:     2,
     evidenceCategory: 'B',
@@ -276,6 +280,7 @@ const REGISTRY: QuestionEvaluationConfig[] = [
     questionText: 'Are machines, units and areas clearly identified?',
     pillar:       'SET_IN_ORDER',
     auditIntent:  'Verify that all equipment and workspace areas have visible, readable identification.',
+    evidenceIntent:    'PRESENCE_DETECTION',
 
     questionType:     1,
     evidenceCategory: 'A',
@@ -328,6 +333,7 @@ const REGISTRY: QuestionEvaluationConfig[] = [
     questionText: 'Are tools and accessories arranged by frequency of use?',
     pillar:       'SET_IN_ORDER',
     auditIntent:  'Assess whether tools are organised in a way that reflects usage frequency.',
+    evidenceIntent:    'ORGANIZATION_ASSESSMENT',
 
     questionType:     2,
     evidenceCategory: 'B',
@@ -380,6 +386,7 @@ const REGISTRY: QuestionEvaluationConfig[] = [
     questionText: 'Are floor markings and storage locations clearly defined?',
     pillar:       'SET_IN_ORDER',
     auditIntent:  'Verify visible floor markings, aisle delineation, and storage location indicators.',
+    evidenceIntent:    'PRESENCE_DETECTION',
 
     questionType:     1,
     evidenceCategory: 'A',
@@ -433,6 +440,7 @@ const REGISTRY: QuestionEvaluationConfig[] = [
     questionText: 'Are documents and records organised, accessible and correctly stored?',
     pillar:       'SET_IN_ORDER',
     auditIntent:  'Assess the organisation and accessibility of documents at the workstation.',
+    evidenceIntent:    'DOCUMENTATION_PRESENCE',
 
     questionType:     2,
     evidenceCategory: 'B',
@@ -490,6 +498,7 @@ const REGISTRY: QuestionEvaluationConfig[] = [
     questionText: 'Are cleaning tools available, accessible and in good condition?',
     pillar:       'SHINE',
     auditIntent:  'Verify presence and readiness of cleaning equipment at the workstation.',
+    evidenceIntent:    'PRESENCE_DETECTION',
 
     questionType:     1,
     evidenceCategory: 'A',
@@ -543,6 +552,7 @@ const REGISTRY: QuestionEvaluationConfig[] = [
     questionText: 'Are floors clean and free from contamination?',
     pillar:       'SHINE',
     auditIntent:  'Assess the cleanliness and contamination status of visible floor surfaces.',
+    evidenceIntent:    'CLEANLINESS_ASSESSMENT',
 
     questionType:     1,
     evidenceCategory: 'A',
@@ -597,6 +607,7 @@ const REGISTRY: QuestionEvaluationConfig[] = [
     questionText: 'Are machines and equipment clean and free from contamination?',
     pillar:       'SHINE',
     auditIntent:  'Assess cleanliness and contamination of visible machine and equipment surfaces.',
+    evidenceIntent:    'CLEANLINESS_ASSESSMENT',
 
     questionType:     1,
     evidenceCategory: 'A',
@@ -650,6 +661,7 @@ const REGISTRY: QuestionEvaluationConfig[] = [
     questionText: 'Is there evidence of a regular cleaning routine being followed?',
     pillar:       'SHINE',
     auditIntent:  'Infer whether a sustained cleaning routine is in place based on visible condition evidence.',
+    evidenceIntent:    'CLEANLINESS_ASSESSMENT',
 
     questionType:     3,
     evidenceCategory: 'C',
@@ -698,6 +710,7 @@ const REGISTRY: QuestionEvaluationConfig[] = [
     questionText: 'Is there a visible colour coding and labelling system in use?',
     pillar:       'STANDARDIZE',
     auditIntent:  'Verify the presence of a consistent colour coding and labelling system across the workspace.',
+    evidenceIntent:    'VISUAL_STANDARD_ASSESSMENT',
 
     questionType:     1,
     evidenceCategory: 'A',
@@ -750,6 +763,7 @@ const REGISTRY: QuestionEvaluationConfig[] = [
     questionText: 'Are work instructions and standard operating procedures displayed at workstations?',
     pillar:       'STANDARDIZE',
     auditIntent:  'Verify that visual work instructions and SOPs are posted and accessible at the point of use.',
+    evidenceIntent:    'DOCUMENTATION_PRESENCE',
 
     questionType:     1,
     evidenceCategory: 'A',
@@ -802,6 +816,7 @@ const REGISTRY: QuestionEvaluationConfig[] = [
     questionText: 'Are storage locations standardised with designated positions for all items?',
     pillar:       'STANDARDIZE',
     auditIntent:  'Verify standardised storage with visible position designations for all regular items.',
+    evidenceIntent:    'VISUAL_STANDARD_ASSESSMENT',
 
     questionType:     1,
     evidenceCategory: 'A',
@@ -855,6 +870,7 @@ const REGISTRY: QuestionEvaluationConfig[] = [
     questionText: 'Are cleaning, inspection and maintenance standards posted and visible?',
     pillar:       'STANDARDIZE',
     auditIntent:  'Verify that cleaning, inspection, and maintenance standards are visibly posted at the relevant locations.',
+    evidenceIntent:    'DOCUMENTATION_PRESENCE',
 
     questionType:     1,
     evidenceCategory: 'A',
@@ -911,6 +927,7 @@ const REGISTRY: QuestionEvaluationConfig[] = [
     questionText: 'Is the overall workplace 5S condition being maintained consistently?',
     pillar:       'SUSTAIN',
     auditIntent:  'Assess the overall sustained condition of 5S compliance across the workspace.',
+    evidenceIntent:    'VISUAL_STANDARD_ASSESSMENT',
 
     questionType:     2,
     evidenceCategory: 'B',
@@ -964,6 +981,7 @@ const REGISTRY: QuestionEvaluationConfig[] = [
     questionText: 'Is there a 5S audit board or improvement board visible and updated?',
     pillar:       'SUSTAIN',
     auditIntent:  'Verify the presence of a visible, updated 5S audit or improvement board.',
+    evidenceIntent:    'PRESENCE_DETECTION',
 
     questionType:     1,
     evidenceCategory: 'A',
@@ -1016,6 +1034,7 @@ const REGISTRY: QuestionEvaluationConfig[] = [
     questionText: 'Is there a kaizen or continuous improvement board visible?',
     pillar:       'SUSTAIN',
     auditIntent:  'Verify the presence of a visible kaizen or continuous improvement board with active improvement items.',
+    evidenceIntent:    'PRESENCE_DETECTION',
 
     questionType:     1,
     evidenceCategory: 'A',
@@ -1068,6 +1087,7 @@ const REGISTRY: QuestionEvaluationConfig[] = [
     questionText: 'Are visual management elements consistently maintained?',
     pillar:       'SUSTAIN',
     auditIntent:  'Assess whether visual management (labels, markings, signs) is consistently maintained across the workspace.',
+    evidenceIntent:    'VISUAL_STANDARD_ASSESSMENT',
 
     questionType:     2,
     evidenceCategory: 'B',

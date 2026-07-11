@@ -20,9 +20,9 @@ import type {
   AnalysisPipelineState,
   AnalysisStage,
 } from '@/types/analysis';
-import { runAuditPipeline } from '@/modules/audit/pipeline/analysisPipeline';
+import { runAuditPipeline, runAuditPipelineV3 } from '@/modules/audit/pipeline/analysisPipeline';
 import { validateImage }   from '@/modules/audit/pipeline/imageValidator';
-import type { ImageValidationV3Result } from '@/types/analysis';
+import type { ImageValidationV3Result, Final5SAuditReport } from '@/types/analysis';
 
 // ── Config ────────────────────────────────────────────────────────────────────
 const RETRY_DELAY = 1500;
@@ -307,9 +307,122 @@ async function invokeAnalysis(
     );
   }
 
+<<<<<<< HEAD
   console.log('[useAnalysisPipeline] Running direct Gemini API analysis…');
   // runAuditPipeline handles its own single retry internally
   return runAuditPipeline(imageBase64, apiKey, extendedContext);
+=======
+  console.log('[useAnalysisPipeline] Running V3 Direct AI Analysis Pipeline...');
+  const report = await runAuditPipelineV3(imageBase64, apiKey, workspaceContext);
+  return transformReportToV2Result(report);
+}
+
+/** Color selector matching grade scale values. */
+function getGradeColor(grade: string): string {
+  const g = grade.toUpperCase();
+  if (g.startsWith('A')) return '#22c55e'; // green
+  if (g.startsWith('B')) return '#3b82f6'; // blue
+  if (g.startsWith('C')) return '#eab308'; // yellow
+  if (g.startsWith('D')) return '#f97316'; // orange
+  return '#ef4444'; // red
+}
+
+/** Legacy structure mapping transformer. */
+function transformReportToV2Result(report: Final5SAuditReport): AuditAnalysisResult {
+  const PILLAR_LABEL_MAP: Record<string, string> = {
+    SORT:         'Sort',
+    SET_IN_ORDER: 'Set in Order',
+    SHINE:        'Shine',
+    STANDARDIZE:  'Standardize',
+    SUSTAIN:      'Sustain',
+  };
+
+  // Convert response items
+  const responses = report.questions.map(q => {
+    let answerState: 'YES' | 'NO' | 'PARTIAL' | 'NOT_VISIBLE' = 'NO';
+    if (q.visibility === 'NOT_VISIBLE') {
+      answerState = 'NOT_VISIBLE';
+    } else if (q.score !== null) {
+      if (q.score >= 3) answerState = 'YES';
+      else if (q.score === 2) answerState = 'PARTIAL';
+    }
+    return {
+      question_id: q.questionId,
+      ai_answer:   answerState,
+      confidence:  0.9, // mock metadata value
+      evidence:    q.evidenceSummary.join(' '),
+    };
+  });
+
+  // Convert pillar scores
+  const pillarScores = report.pillars.map(p => {
+    const qList = report.questions.filter(q => q.questionId.startsWith(p.pillar));
+    return {
+      pillar:         (PILLAR_LABEL_MAP[p.pillar] ?? p.pillar) as any,
+      score:          p.actualScore,
+      maximum:        p.maximumScore,
+      percentage:     p.percentage,
+      raw_percentage: p.percentage,
+      passed:         qList.filter(q => q.score !== null && q.score >= 3).length,
+      partial:        qList.filter(q => q.score === 2).length,
+      failed:         qList.filter(q => q.score !== null && q.score <= 1).length,
+      not_visible:    qList.filter(q => q.visibility === 'NOT_VISIBLE').length,
+      not_applicable: 0,
+      critical:       qList.filter(q => q.score === 0).length,
+      cap_applied:    false,
+      top_deductions: [],
+    };
+  });
+
+  // Convert recommendations
+  const recommendations = report.recommendations.questionRecommendations.map((qRec, idx) => {
+    const pillarName = qRec.questionId.split('_')[0];
+    return {
+      pillar:             PILLAR_LABEL_MAP[pillarName] ?? pillarName,
+      severity:           'MAJOR' as const,
+      priority:           idx + 1,
+      priority_label:     'High Priority' as const,
+      title:              qRec.issue,
+      description:        qRec.action,
+      problem:            qRec.issue,
+      root_cause:         qRec.issue,
+      corrective_action:  qRec.action,
+      expected_benefit:   'Restores 5S compliance standard.',
+      linked_question_id: qRec.questionId,
+    };
+  });
+
+  return {
+    template: {
+      id:      report.metadata.auditTemplate,
+      name:    'Standard 5S Audit',
+      version: report.metadata.configurationVersion,
+    },
+    prompt_version:    'v3.0',
+    vision_model:      'gemini-2.5-flash',
+    schema_version:    '3.0',
+    audit_confidence:  0.9,
+    before: {
+      score: {
+        pillar_scores:      pillarScores,
+        overall_score:      report.summary.actualScore,
+        overall_maximum:    report.summary.maximumScore,
+        overall_percentage: report.summary.overallPercentage,
+        grade:              report.summary.grade,
+        grade_color:        getGradeColor(report.summary.grade),
+        total_answered:     report.summary.questionsEvaluated,
+        total_questions:    report.summary.questionsEvaluated + report.summary.questionsSkipped,
+        critical_failures:  0,
+        computed_at:        report.metadata.generatedTimestamp,
+      },
+      responses,
+    },
+    recommendations,
+    improvement_prompt:    null,
+    explainability_report: null,
+    scoringMethod:         'AI Audit V3 (Deterministic)',
+  };
+>>>>>>> 859e5d8 (feat(pipeline-v3): wire complete V3 pipeline loop & integrate into frontend hook)
 }
 
 // ── Helpers ───────────────────────────────────────────────────────────────────

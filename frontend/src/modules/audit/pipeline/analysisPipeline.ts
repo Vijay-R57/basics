@@ -769,3 +769,6 @@ export async function runAuditPipeline(
 
   return result;
 }
+
+export { runAuditPipelineV3 } from './runAuditPipelineV3';
+

@@ -703,3 +703,21 @@ export const TOTAL_QUESTIONS = PILLAR_ORDER.reduce(
 
 /** Questions per pillar (used in validation) */
 export const QUESTIONS_PER_PILLAR = 4;
+
+// ── Sprint 6.1 — Backward Compatibility Bridge ───────────────────────────────
+//
+// All modules that import from this file continue to work unchanged.
+//
+// New modules should import from:
+//   @/modules/audit/ruleConfiguration (the public API)
+//
+// This bridge is intentionally minimal — it does NOT re-export the new
+// EnrichedAuditQuestion type or registry functions, to avoid circular imports.
+// Consumers that need the enriched configuration should migrate to
+// the ruleConfiguration/index.ts public API.
+//
+// The following export is provided for validation and testing convenience only:
+
+/** @deprecated Use loadQuestionConfiguration() from ruleConfiguration/index.ts */
+export { getAllEnabledQuestions as getEnabledQuestionsFromRegistry } from '../ruleConfiguration/questionLoader';
+

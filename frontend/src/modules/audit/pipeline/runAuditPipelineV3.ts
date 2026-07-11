@@ -128,8 +128,12 @@ export async function runAuditPipelineV3(
   // ── Stages 9 & 10: Pillar & Overall Aggregation ─────────────────────────────
   timer.start();
   debugLog('Executing Stages 9 & 10: Score Aggregation...');
-  const pillarScores = calculatePillarScores(questionScores, config);
-  const overallScore = calculateOverallScore(pillarScores, config);
+  const aggregationConfig = {
+    pillars: Object.keys(config.questions),
+    rounding: { decimals: 2 },
+  };
+  const pillarScores = calculatePillarScores(questionScores, aggregationConfig);
+  const overallScore = calculateOverallScore(pillarScores, aggregationConfig);
   const stage9Dur = timer.stop();
   stages.push(recordStageTrace('score-aggregator', stage9Dur, 'success'));
 

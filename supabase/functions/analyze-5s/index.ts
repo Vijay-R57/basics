@@ -982,4 +982,4 @@ serve(async (req: Request) => {
       { status: 500, headers: { ...CORS, "Content-Type": "application/json" } },
     );
   }
-});
+}, { port: Number(Deno.env.get("PORT") ?? 8000) });

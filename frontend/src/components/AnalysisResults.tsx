@@ -271,6 +271,76 @@ export default function AnalysisResults({
       });
     }
 
+    // Detailed Question-by-Question Assessment Section
+    checkPageBreak(30);
+    doc.setFont('helvetica', 'bold');
+    doc.setFontSize(10);
+    doc.setTextColor(50, 50, 50);
+    doc.text('DETAILED QUESTION ASSESSMENT', margin, y);
+    y += 4;
+    doc.setLineWidth(0.3);
+    doc.line(margin, y, pageWidth - margin, y);
+    y += 6;
+
+    pillars.forEach((p) => {
+      checkPageBreak(20);
+      doc.setFont('helvetica', 'bold');
+      doc.setFontSize(9);
+      doc.setTextColor(26, 80, 54);
+      doc.text(`${p.label.toUpperCase()} PILLAR (${p.score} / ${p.maxScore})`, margin, y);
+      y += 5;
+
+      p.questions.forEach((q, idx) => {
+        const ratingEnum = q.score === 4 ? 'VERY_GOOD' :
+                           q.score === 3 ? 'GOOD' :
+                           q.score === 2 ? 'AVERAGE' :
+                           q.score === 1 ? 'BAD' : 'VERY_BAD';
+
+        // Question header
+        const qNum = `${idx + 1}. `;
+        const qHeader = `${qNum}${q.question}`;
+        const qHeaderLines = doc.splitTextToSize(qHeader, pageWidth - (margin * 2) - 6);
+        
+        // Score & rating enum line
+        const scoreRatingText = `Score: ${q.score}/4  |  Rating: ${ratingEnum}`;
+        
+        // Evidence & Reason lines
+        const evidenceText = q.evidence ? `Evidence: ${q.evidence}` : 'Evidence: None recorded.';
+        const reasonText = q.reason ? `Reasoning: ${q.reason}` : 'Reasoning: None recorded.';
+        const evidenceLines = doc.splitTextToSize(evidenceText, pageWidth - (margin * 2) - 8);
+        const reasonLines = doc.splitTextToSize(reasonText, pageWidth - (margin * 2) - 8);
+        
+        const blockHeight = (qHeaderLines.length * 4.5) + 5 + (evidenceLines.length * 4) + (reasonLines.length * 4) + 6;
+        checkPageBreak(blockHeight);
+
+        // Render question text
+        doc.setFont('helvetica', 'bold');
+        doc.setFontSize(8.5);
+        doc.setTextColor(60, 60, 60);
+        doc.text(qHeaderLines, margin + 2, y);
+        y += (qHeaderLines.length * 4.5);
+
+        // Render score & rating
+        doc.setFont('helvetica', 'bold');
+        doc.setFontSize(8);
+        doc.setTextColor(26, 80, 54);
+        doc.text(scoreRatingText, margin + 4, y);
+        y += 4.5;
+
+        // Render evidence
+        doc.setFont('helvetica', 'normal');
+        doc.setFontSize(8);
+        doc.setTextColor(80, 80, 80);
+        doc.text(evidenceLines, margin + 4, y);
+        y += (evidenceLines.length * 4);
+
+        // Render reason
+        doc.text(reasonLines, margin + 4, y);
+        y += (reasonLines.length * 4) + 4;
+      });
+      y += 2;
+    });
+
     // Timeline Footer
     if (timeline) {
       checkPageBreak(35);

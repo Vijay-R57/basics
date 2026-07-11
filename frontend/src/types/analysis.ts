@@ -433,6 +433,59 @@ export interface VisibilityDecision {
   confidence:  number;
 }
 
+// ── Standardized Evidence Engine (Pipeline V3 — Phase 6.2) ──────────────────
+//
+// Output of standardizedEvidence/index.ts.
+// One StandardizedObservation is produced for every audit question.
+// Consumed by the Deterministic Rule Engine (Sprint 6.3).
+//
+// Dual representation:
+//   evidence    → human-readable sentences (preserved from Sprint 3)
+//   evidenceIds → machine-readable EvidenceKey identifiers (added in Sprint 6.2)
+
+/**
+ * A single standardized observation for one audit question.
+ *
+ * Contains BOTH representations:
+ *   - evidence: original human-readable sentences from the Observation Engine
+ *   - evidenceIds: machine-readable identifiers from the Evidence Vocabulary
+ *
+ * The Rule Engine must ONLY evaluate evidenceIds — never inspect evidence strings.
+ * Human-readable evidence is preserved for UI display and audit report generation.
+ */
+export interface StandardizedObservation {
+  /** Audit question ID, e.g. "SORT_Q1". */
+  questionId:        string;
+  /**
+   * true  → relevant objects were visible; evidenceIds will be populated.
+   * false → no relevant evidence; evidenceIds will be empty.
+   */
+  visible:           boolean;
+  /**
+   * Human-readable evidence sentences preserved from the Observation Engine.
+   * Used by the audit report — never evaluated by the Rule Engine.
+   */
+  evidence:          string[];
+  /**
+   * Machine-readable evidence identifiers from the shared Evidence Vocabulary.
+   * These are the ONLY input the Rule Engine may use for evaluation.
+   * May contain 'UNKNOWN_OBJECT' for objects that had no vocabulary match.
+   * Always deduplicated. Always sorted alphabetically for determinism.
+   */
+  evidenceIds:       string[];
+  /**
+   * Observation certainty inherited from the Structured Observation Engine (0–100).
+   * Not a compliance score.
+   */
+  confidence:        number;
+  /**
+   * Object names from the observation that could not be mapped to a vocabulary key.
+   * Present only when at least one unknown object was encountered.
+   * Useful for vocabulary extension decisions.
+   */
+  _unknownObjects?:  string[];
+}
+
 // ── Analysis pipeline stages (for progress UX) ───────────────────────────────
 export type AnalysisStage =
   | 'idle'

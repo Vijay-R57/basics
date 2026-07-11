@@ -255,6 +255,67 @@ export interface GeminiVisionResult {
   _error?: string;
 }
 
+// ── Structured Observation Engine (Pipeline V3 — Phase 3) ────────────────────
+//
+// Output of observationEngine.ts.
+// One StructuredObservationResult is produced for each audit question.
+// Contains ONLY factual visual descriptions — no ratings, scores, or compliance.
+// Consumed by the Observation Validator (Sprint 4).
+
+/**
+ * A single structured observation for one audit question.
+ *
+ * IMPORTANT: This object MUST NOT contain:
+ *   - Ratings (VERY_GOOD, GOOD, etc.)
+ *   - Numeric scores (0–4)
+ *   - Compliance judgements
+ *   - Recommendations
+ *   - Subjective language
+ *
+ * Confidence here measures observation certainty — NOT compliance level.
+ */
+export interface QuestionObservation {
+  /**
+   * true  → at least one relevant object was visible and matched.
+   * false → no relevant evidence found in the image for this question.
+   */
+  visible:     boolean;
+  /**
+   * One factual sentence per matched visible object.
+   * Each sentence describes what was seen, where, and how many.
+   * Never evaluates compliance. Never uses subjective wording.
+   * Empty array when visible === false.
+   */
+  evidence:    string[];
+  /**
+   * Names of the matched GeminiVisionObjects that contributed to this observation.
+   * Taken verbatim from GeminiVisionResult.objects[].name — never invented.
+   */
+  objects:     string[];
+  /**
+   * Relevant readable text strings found in the image for this question.
+   * Subset of GeminiVisionResult.visibleText — raw strings, no interpretation.
+   */
+  visibleText: string[];
+  /**
+   * Observation certainty: average confidence of matched objects (0–100).
+   * Falls back to 30 (uncertainty default) when no objects match.
+   * This is NOT a compliance or quality score.
+   */
+  confidence:  number;
+}
+
+/**
+ * The complete observation output for one audit question.
+ * The Observation Validator (Sprint 4) consumes an array of these.
+ */
+export interface StructuredObservationResult {
+  /** Audit question ID, e.g. "SORT_Q1". Matches AuditQuestion.id in questions.ts. */
+  questionId:  string;
+  /** The structured observation produced for this question. */
+  observation: QuestionObservation;
+}
+
 // ── Analysis pipeline stages (for progress UX) ───────────────────────────────
 export type AnalysisStage =
   | 'idle'

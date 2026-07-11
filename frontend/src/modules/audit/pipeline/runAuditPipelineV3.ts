@@ -12,7 +12,7 @@ import { validateImage } from './imageValidator';
 import { analyzeImageWithGemini } from './geminiVisionAnalyzer';
 import { buildStructuredObservations } from './observationEngine';
 import { validateObservations } from './observationValidator';
-import { evaluateVisibility } from './visibilityEngine';
+import { determineVisibility } from './visibilityEngine';
 import { buildEvidenceIds } from '../standardizedEvidence';
 import { evaluateAllQuestions } from '../ruleEngine';
 import { calculateAllQuestionScores } from '../questionScore';
@@ -91,7 +91,7 @@ export async function runAuditPipelineV3(
   // ── Stage 5: Visibility Decision ────────────────────────────────────────────
   timer.start();
   debugLog('Executing Stage 5: Visibility Decision...');
-  const visibilityDecisions = evaluateVisibility(structuredObs, config.allQuestions);
+  const visibilityDecisions = determineVisibility(structuredObs, visionOutput, config.allQuestions);
   const stage5Dur = timer.stop();
   stages.push(recordStageTrace('visibility-engine', stage5Dur, 'success'));
 

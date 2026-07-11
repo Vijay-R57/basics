@@ -718,6 +718,117 @@ export interface AuditRecommendationResult {
   overallRecommendation:   OverallRecommendation;
 }
 
+// ── Report Builder Engine (Pipeline V3 — Phase 8) ─────────────────────────────
+//
+// Output of report/index.ts.
+// The complete, immutable Final 5S Audit Report representing the single source of truth.
+
+/** Metadata section for the final report. */
+export interface ReportMetadata {
+  /** Unique audit identifier. */
+  auditId:              string;
+  /** ISO Date string when the audit was performed. */
+  auditDate:            string;
+  /** Version of the AI Pipeline, e.g. "V3". */
+  pipelineVersion:      string;
+  /** Version of the questions configuration registry. */
+  configurationVersion: string;
+  /** Active audit template name. */
+  auditTemplate:        string;
+  /** Total pipeline execution duration in milliseconds. */
+  executionTime:        number;
+  /** Schema version of this report. */
+  reportVersion:        string;
+  /** ISO timestamp when this report was built. */
+  generatedTimestamp:   string;
+}
+
+/** Overall audit summary statistics. */
+export interface ReportOverallSummary {
+  /** Combined percentage score. */
+  overallPercentage:  number;
+  /** Calculated letter grade. */
+  grade:              string;
+  /** Total aggregated score. */
+  actualScore:        number;
+  /** Total maximum possible score. */
+  maximumScore:       number;
+  /** Count of scored questions. */
+  questionsEvaluated: number;
+  /** Count of skipped questions. */
+  questionsSkipped:   number;
+}
+
+/** Pillar summary results. */
+export interface ReportPillarSummary {
+  /** Pillar identifier, e.g. "SORT". */
+  pillar:       string;
+  /** Pillar total actual score. */
+  actualScore:  number;
+  /** Pillar maximum possible score. */
+  maximumScore: number;
+  /** Pillar percentage score (rounded). */
+  percentage:   number;
+}
+
+/** Question scoring and details section. */
+export interface ReportQuestionResult {
+  /** Question identifier, e.g. "SORT_Q1". */
+  questionId:      string;
+  /** Factual question prompt text. */
+  question:        string;
+  /** Visibility status: 'VISIBLE' | 'PARTIALLY_VISIBLE' | 'NOT_VISIBLE' */
+  visibility:      string;
+  /** Assigned rating: 'VERY_GOOD' | 'GOOD' | etc. */
+  rating:          string;
+  /** Assigned score, or null if skipped. */
+  score:           number | null;
+  /** Maximum score possible for this question, or null if skipped. */
+  maxScore:        number | null;
+  /** true if question was scored, false if skipped. */
+  scoreEligible:   boolean;
+  /** Human-readable evidence sentences. */
+  evidenceSummary: string[];
+  /** Linked recommendation action text, if question was low-rated. */
+  recommendation?: string;
+}
+
+/** Technical execution info section. */
+export interface ReportExecutionInformation {
+  /** AI Pipeline version. */
+  pipelineVersion:      string;
+  /** Questions configuration version. */
+  configurationVersion: string;
+  /** Execution duration in milliseconds. */
+  executionDuration:    number;
+  /** Reference identifier for the audit execution trace. */
+  auditTraceReference:  string;
+}
+
+/** Complete Final 5S Audit Report object. */
+export interface Final5SAuditReport {
+  /** 1. Audit Metadata */
+  metadata:        ReportMetadata;
+  /** 2. Overall Summary */
+  summary:         ReportOverallSummary;
+  /** 3. Pillar Summary */
+  pillars:         ReportPillarSummary[];
+  /** 4. Question Results */
+  questions:       ReportQuestionResult[];
+  /** 5. Recommendations */
+  recommendations: AuditRecommendationResult;
+  /** 6. Audit Statistics */
+  statistics: {
+    eligibleQuestions: number;
+    skippedQuestions:  number;
+    evaluatedPillars:   number;
+    maximumScore:      number;
+    actualScore:       number;
+  };
+  /** 7. Execution Information */
+  execution:       ReportExecutionInformation;
+}
+
 // ── Analysis pipeline stages (for progress UX) ───────────────────────────────
 export type AnalysisStage =
   | 'idle'

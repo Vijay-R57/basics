@@ -316,6 +316,75 @@ export interface StructuredObservationResult {
   observation: QuestionObservation;
 }
 
+// ── Observation Validator (Pipeline V3 — Phase 4) ────────────────────────────
+//
+// Output of observationValidator.ts.
+// Produced after running all 12 quality checks on StructuredObservationResult[].
+// Consumed by the Visibility Decision Engine (Sprint 5) and the orchestrator.
+
+/**
+ * Standardised error codes for the 12 observation validation checks.
+ * Each code maps to exactly one category of failure.
+ * Reusable across the project — do not add codes specific to one check.
+ */
+export type ValidationErrorCode =
+  | 'MISSING_QUESTION'        // Check 1 — an expected question has no observation
+  | 'DUPLICATE_QUESTION'      // Check 2 — the same questionId appears more than once
+  | 'INVALID_FIELD'           // Check 3 — a required field is absent
+  | 'INVALID_DATA_TYPE'       // Check 4 — a field value has the wrong data type
+  | 'INVALID_CONFIDENCE'      // Check 5 — confidence is outside the 0–100 range
+  | 'INVALID_JSON'            // Check 11 — the collection fails JSON serialisation
+  | 'OBJECT_NOT_FOUND'        // Check 7 — an object name is not in the Vision output
+  | 'VISIBLE_FLAG_MISMATCH'   // Checks 8 & 9 — visible flag inconsistent with content
+  | 'EMPTY_OBSERVATION'       // Check 12 — visible=true but all arrays are empty
+  | 'INVALID_EVIDENCE'        // Check 6 — evidence contains banned subjective words
+  | 'SCHEMA_ERROR'            // Generic — observation does not match expected schema
+  | 'CONFIDENCE_INCONSISTENCY'; // Check 10 — advisory: visible=true but confidence=0
+
+/**
+ * A single validation error entry in the validation report.
+ * Collection-level errors use questionId = "GLOBAL".
+ */
+export interface ObservationValidationError {
+  /** The questionId of the failing observation, or "GLOBAL" for collection-level errors. */
+  questionId: string;
+  /** Standardised error code identifying the category of failure. */
+  code:       ValidationErrorCode;
+  /** Human-readable description of the specific failure. */
+  message:    string;
+}
+
+/**
+ * Full validation report produced by the Observation Validator.
+ *
+ * Pipeline contract:
+ *   validated === true  → PASS_TO_VISIBILITY_ENGINE
+ *   validated === false → STOP_PIPELINE — do NOT proceed to scoring
+ *
+ * Note: CONFIDENCE_INCONSISTENCY errors are advisory and do NOT set validated=false.
+ */
+export interface ObservationValidationResult {
+  /** true = all blocking checks passed; false = at least one blocking check failed. */
+  validated: boolean;
+  /** Human-readable pass/fail status. */
+  status:    'PASS' | 'FAIL';
+  summary: {
+    /** Total expected observations (equals total audit questions). */
+    totalQuestions:     number;
+    /** Observations that passed all blocking checks. */
+    validatedQuestions: number;
+    /** Observations with at least one blocking failure. */
+    failedQuestions:    number;
+  };
+  /**
+   * All validation errors found.
+   * Empty when validated === true.
+   * May contain CONFIDENCE_INCONSISTENCY entries even when validated === true
+   * (advisory only — does not block the pipeline).
+   */
+  errors: ObservationValidationError[];
+}
+
 // ── Analysis pipeline stages (for progress UX) ───────────────────────────────
 export type AnalysisStage =
   | 'idle'

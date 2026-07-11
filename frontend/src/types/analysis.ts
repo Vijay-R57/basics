@@ -385,6 +385,54 @@ export interface ObservationValidationResult {
   errors: ObservationValidationError[];
 }
 
+// ── Visibility Decision Engine (Pipeline V3 — Phase 5) ───────────────────────
+//
+// Output of visibilityEngine.ts.
+// One VisibilityDecision is produced for every audit question.
+// Consumed by the Deterministic Rule Engine (Sprint 6).
+//
+// IMPORTANT: visibility describes evidence availability — NOT compliance.
+//   VISIBLE          → sufficient evidence exists; question proceeds to Rule Engine.
+//   PARTIALLY_VISIBLE → limited evidence; Rule Engine receives it with reduced confidence.
+//   NOT_VISIBLE      → insufficient evidence; question is excluded from deterministic scoring.
+
+/**
+ * The three possible visibility statuses for an audit question.
+ *
+ * These describe whether the IMAGE contains enough evidence to evaluate the question.
+ * They do NOT describe whether the workplace is compliant or non-compliant.
+ */
+export type VisibilityStatus = 'VISIBLE' | 'PARTIALLY_VISIBLE' | 'NOT_VISIBLE';
+
+/**
+ * The visibility determination for a single audit question.
+ *
+ * Pipeline contract:
+ *   VISIBLE | PARTIALLY_VISIBLE → PASS_TO_RULE_ENGINE
+ *   NOT_VISIBLE                 → EXCLUDE_FROM_SCORING (pipeline continues for other questions)
+ *
+ * IMPORTANT: reason must NEVER mention compliance, rating, score, or grade.
+ * It must ONLY describe WHY the visibility status was assigned.
+ */
+export interface VisibilityDecision {
+  /** Audit question ID, e.g. "SORT_Q1". */
+  questionId:  string;
+  /** Visibility status — describes evidence availability, not compliance. */
+  visibility:  VisibilityStatus;
+  /**
+   * Human-readable explanation of why this visibility status was assigned.
+   * References actual visible objects when available.
+   * Never mentions compliance, ratings, or scores.
+   */
+  reason:      string;
+  /**
+   * Certainty of the visibility determination (0–100).
+   * Derived from the matched object confidence values in the observation.
+   * This is NOT a compliance score.
+   */
+  confidence:  number;
+}
+
 // ── Analysis pipeline stages (for progress UX) ───────────────────────────────
 export type AnalysisStage =
   | 'idle'

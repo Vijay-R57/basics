@@ -486,6 +486,45 @@ export interface StandardizedObservation {
   _unknownObjects?:  string[];
 }
 
+// ── Deterministic Rule Engine (Pipeline V3 — Phase 6.3) ──────────────────────
+//
+// Output of ruleEngine/index.ts.
+// One RuleEvaluationResult is produced for every audit question.
+// Consumed by the Question Score Calculator (Sprint 6.4).
+
+/** Possible rating levels returned by the Deterministic Rule Engine. */
+export type AuditRating = 'VERY_GOOD' | 'GOOD' | 'AVERAGE' | 'BAD' | 'VERY_BAD' | 'NOT_SCORED';
+
+/**
+ * The evaluation result for a single audit question.
+ *
+ * This is the pure, deterministic output of the Rule Engine.
+ * It contains NO scores, percentages, or grades. It only maps the visible evidence
+ * to a rating according to the question configuration.
+ */
+export interface RuleEvaluationResult {
+  /** Audit question ID, e.g. "SORT_Q1". */
+  questionId:        string;
+  /** Visibility status of the question: 'VISIBLE' | 'PARTIALLY_VISIBLE' | 'NOT_VISIBLE' */
+  visibility:        string;
+  /** Assigned rating based on deterministic rule evaluation. */
+  rating:            AuditRating;
+  /** Required evidence keys that were actually detected in the observation. */
+  matchedEvidence:   string[];
+  /** Required evidence keys that were NOT detected in the observation. */
+  missingEvidence:   string[];
+  /** Forbidden evidence keys that were detected in the observation (and excluded). */
+  forbiddenEvidence: string[];
+  /** Optional evidence keys that were detected in the observation. */
+  matchedOptional:   string[];
+  /** Count of matched required evidence keys. */
+  matchedCount:      number;
+  /** The specific threshold configuration key that matched, e.g. "average". */
+  matchedRule:       string;
+  /** Step-by-step trace of the rule execution, populated in debug mode. */
+  evaluationTrace:   string[];
+}
+
 // ── Analysis pipeline stages (for progress UX) ───────────────────────────────
 export type AnalysisStage =
   | 'idle'

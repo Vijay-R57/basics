@@ -141,6 +141,51 @@ export interface ImageValidationResult {
   warnings:         string[];
 }
 
+// ── Image Validation V3 (Pipeline V3 — Phase 1) ───────────────────────────────
+//
+// Output of imageValidator.ts. Consumed by the pipeline gate in
+// useAnalysisPipeline.ts. Independent of the UI-level ImageValidationResult above.
+
+export type ImageValidationStatus = 'VALID' | 'INVALID';
+
+export interface ImageValidationV3Metadata {
+  /** Image width in pixels. 0 if decode failed. */
+  width:       number;
+  /** Image height in pixels. 0 if decode failed. */
+  height:      number;
+  /** Simplified aspect ratio string, e.g. "16:9". "Unknown" if decode failed. */
+  aspectRatio: string;
+  /** MIME type detected from the data URI prefix or magic bytes. */
+  fileType:    string;
+  /** Estimated decoded file size in bytes. */
+  fileSize:    number;
+}
+
+export interface ImageValidationV3Result {
+  /**
+   * Pipeline gate flag.
+   * false → pipeline must stop immediately; do NOT call Gemini.
+   * true  → image passed all checks; pipeline may proceed.
+   */
+  isValid:      boolean;
+  /** Human-readable status string. */
+  status:       ImageValidationStatus;
+  /**
+   * Technical image quality score (0–100).
+   * Based ONLY on resolution, decode success, file size, and format.
+   * Never evaluates workplace conditions or audit quality.
+   */
+  qualityScore: number;
+  /** Image metadata captured during validation. */
+  metadata:     ImageValidationV3Metadata;
+  /**
+   * Blocking validation errors.
+   * Non-empty only when isValid === false.
+   * Empty array when isValid === true.
+   */
+  errors:       string[];
+}
+
 // ── Analysis pipeline stages (for progress UX) ───────────────────────────────
 export type AnalysisStage =
   | 'idle'

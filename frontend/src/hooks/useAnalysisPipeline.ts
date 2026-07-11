@@ -21,6 +21,8 @@ import type {
   AnalysisStage,
 } from '@/types/analysis';
 import { runAuditPipeline } from '@/modules/audit/pipeline/analysisPipeline';
+import { validateImage }   from '@/modules/audit/pipeline/imageValidator';
+import type { ImageValidationV3Result } from '@/types/analysis';
 
 // ── Config ────────────────────────────────────────────────────────────────────
 const RETRY_DELAY = 1500;
@@ -76,6 +78,25 @@ export function useAnalysisPipeline(officeName: string) {
       setResults(null);
 
       try {
+        // ── Stage 0 — Image Validation Gate (Pipeline V3 Phase 1) ──────────────
+        // The image MUST pass validation before it is allowed to reach Gemini.
+        // If isValid === false, the pipeline stops here. Gemini is never called.
+        setStage('compressing', 4, 'Validating image…');
+        const validationResult: ImageValidationV3Result = await validateImage(beforeImage);
+
+        if (!validationResult.isValid) {
+          const firstError = validationResult.errors[0] ?? 'Image validation failed.';
+          setStage('error', 0, firstError);
+          toast({
+            title:       'Image Validation Failed',
+            description: firstError,
+            variant:     'destructive',
+          });
+          return; // ← Pipeline stopped. Gemini never called.
+        }
+
+        if (abortRef.current) return;
+
         // Stage 1 — Compress
         setStage('compressing', 8, 'Compressing image…');
         const compBefore = await resizeImage(beforeImage, 1024);

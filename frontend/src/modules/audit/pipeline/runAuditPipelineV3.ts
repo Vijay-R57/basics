@@ -43,120 +43,135 @@ export async function runAuditPipelineV3(
 
   debugGroup(`V3 Pipeline Execution Started (Audit ID: ${auditId})`);
 
-  // Initialize timer and stage recorder
-  const timer = new ExecutionTimer();
   const stages: PipelineStageTrace[] = [];
 
-  // Load configuration first
-  const config = loadQuestionConfiguration();
+  // Helper to compile correct timing objects
+  const makeTiming = (start: number, end: number) => ({
+    startTime: new Date(start).toISOString(),
+    endTime:   new Date(end).toISOString(),
+    duration:  Math.max(0, end - start),
+  });
 
-  // ── Stage 1: Image Validation ──────────────────────────────────────────────
-  timer.start();
-  debugLog('Executing Stage 1: Image Validation...');
+  // Stage 1: Audit Started
+  stages.push(recordStageTrace('Audit Started', makeTiming(pipelineStartTime, pipelineStartTime), 'PASS', 'PASS'));
+
+  // Stage 7: Rule Configuration (timed at start)
+  const tConfigStart = Date.now();
+  const config = loadQuestionConfiguration();
+  const tConfigEnd = Date.now();
+
+  // ── Stage 2: Image Validation ──────────────────────────────────────────────
+  const tValStart = Date.now();
+  debugLog('Executing Stage 2: Image Validation...');
   const valResult = await validateImage(imageBase64);
-  const stage1Dur = timer.stop();
-  stages.push(recordStageTrace('image-validation', stage1Dur, valResult.isValid ? 'success' : 'failed'));
+  const tValEnd = Date.now();
+  stages.push(recordStageTrace('Image Validation', makeTiming(tValStart, tValEnd), valResult.isValid ? 'PASS' : 'FAIL', valResult.isValid ? 'PASS' : 'STOP_PIPELINE'));
 
   if (!valResult.isValid) {
     debugGroupEnd();
     throw new Error(`Image validation failed: ${valResult.errors.join('; ')}`);
   }
 
-  // ── Stage 2: Gemini Vision perception ───────────────────────────────────────
-  timer.start();
-  debugLog('Executing Stage 2: Gemini Vision Perception...');
+  // ── Stage 3: Gemini Vision perception ───────────────────────────────────────
+  const tVisionStart = Date.now();
+  debugLog('Executing Stage 3: Gemini Vision Perception...');
   const visionOutput = await analyzeImageWithGemini(imageBase64, apiKey);
-  const stage2Dur = timer.stop();
-  stages.push(recordStageTrace('gemini-vision', stage2Dur, 'success'));
+  const tVisionEnd = Date.now();
+  stages.push(recordStageTrace('Gemini Vision', makeTiming(tVisionStart, tVisionEnd), 'PASS', 'PASS'));
 
-  // ── Stage 3: Structured Observations ────────────────────────────────────────
-  timer.start();
-  debugLog('Executing Stage 3: Structured Observations...');
+  // ── Stage 4: Structured Observations ────────────────────────────────────────
+  const tObsStart = Date.now();
+  debugLog('Executing Stage 4: Structured Observations...');
   const structuredObs = buildStructuredObservations(visionOutput, config.allQuestions);
-  const stage3Dur = timer.stop();
-  stages.push(recordStageTrace('structured-observation', stage3Dur, 'success'));
+  const tObsEnd = Date.now();
+  stages.push(recordStageTrace('Structured Observation', makeTiming(tObsStart, tObsEnd), 'PASS', 'PASS'));
 
-  // ── Stage 4: Observation Validation ─────────────────────────────────────────
-  timer.start();
-  debugLog('Executing Stage 4: Observation Validation...');
+  // ── Stage 5: Observation Validation ─────────────────────────────────────────
+  const tObsValStart = Date.now();
+  debugLog('Executing Stage 5: Observation Validation...');
   const obsValResult = validateObservations(structuredObs, visionOutput, config.allQuestions);
-  const stage4Dur = timer.stop();
-  stages.push(recordStageTrace('observation-validation', stage4Dur, obsValResult.validated ? 'success' : 'failed'));
+  const tObsValEnd = Date.now();
+  stages.push(recordStageTrace('Observation Validation', makeTiming(tObsValStart, tObsValEnd), obsValResult.validated ? 'PASS' : 'FAIL', obsValResult.validated ? 'PASS' : 'STOP_PIPELINE'));
 
   if (!obsValResult.validated) {
     debugGroupEnd();
     throw new Error('Structured observation validation failed. Contradiction detected.');
   }
 
-  // ── Stage 5: Visibility Decision ────────────────────────────────────────────
-  timer.start();
-  debugLog('Executing Stage 5: Visibility Decision...');
+  // ── Stage 6: Visibility Decision ────────────────────────────────────────────
+  const tVisStart = Date.now();
+  debugLog('Executing Stage 6: Visibility Decision...');
   const visibilityDecisions = determineVisibility(structuredObs, visionOutput, config.allQuestions);
-  const stage5Dur = timer.stop();
-  stages.push(recordStageTrace('visibility-engine', stage5Dur, 'success'));
+  const tVisEnd = Date.now();
+  stages.push(recordStageTrace('Visibility Decision', makeTiming(tVisStart, tVisEnd), 'PASS', 'PASS'));
 
-  // ── Stage 6: Standardized Evidence ──────────────────────────────────────────
-  timer.start();
-  debugLog('Executing Stage 6: Standardized Evidence...');
+  // ── Stage 7: Rule Configuration (Recorded here in the 14-stage sequence) ───
+  stages.push(recordStageTrace('Rule Configuration', makeTiming(tConfigStart, tConfigEnd), 'PASS', 'PASS'));
+
+  // ── Stage 8: Evidence Mapping ──────────────────────────────────────────────
+  const tMapStart = Date.now();
+  debugLog('Executing Stage 8: Standardized Evidence Mapping...');
   const stdEvidenceResult = buildEvidenceIds(structuredObs, visionOutput);
-  const stage6Dur = timer.stop();
-  stages.push(recordStageTrace('standardized-evidence', stage6Dur, stdEvidenceResult ? 'success' : 'failed'));
+  const tMapEnd = Date.now();
+  stages.push(recordStageTrace('Evidence Mapping', makeTiming(tMapStart, tMapEnd), stdEvidenceResult ? 'PASS' : 'FAIL', stdEvidenceResult ? 'PASS' : 'STOP_PIPELINE'));
 
   if (!stdEvidenceResult) {
     debugGroupEnd();
     throw new Error('Standardized evidence mapping failed configuration pre-flight checks.');
   }
 
-  // ── Stage 7: Deterministic Rule Engine ──────────────────────────────────────
-  timer.start();
-  debugLog('Executing Stage 7: Deterministic Rule Engine...');
+  // ── Stage 9: Rule Evaluation ───────────────────────────────────────────────
+  const tEvalStart = Date.now();
+  debugLog('Executing Stage 9: Deterministic Rule Evaluation...');
   const ruleResults = evaluateAllQuestions(
     stdEvidenceResult.observations,
     visibilityDecisions,
     config,
   );
-  const stage7Dur = timer.stop();
-  stages.push(recordStageTrace('rule-engine', stage7Dur, 'success'));
+  const tEvalEnd = Date.now();
+  stages.push(recordStageTrace('Rule Evaluation', makeTiming(tEvalStart, tEvalEnd), 'PASS', 'PASS'));
 
-  // ── Stage 8: Question Score Calculator ──────────────────────────────────────
-  timer.start();
-  debugLog('Executing Stage 8: Question Scoring...');
+  // ── Stage 10: Question Scores ──────────────────────────────────────────────
+  const tQSStart = Date.now();
+  debugLog('Executing Stage 10: Question Scoring...');
   const questionScores = calculateAllQuestionScores(ruleResults, config);
-  const stage8Dur = timer.stop();
-  stages.push(recordStageTrace('scoring-engine', stage8Dur, 'success'));
+  const tQSEnd = Date.now();
+  stages.push(recordStageTrace('Question Scores', makeTiming(tQSStart, tQSEnd), 'PASS', 'PASS'));
 
-  // ── Stages 9 & 10: Pillar & Overall Aggregation ─────────────────────────────
-  timer.start();
-  debugLog('Executing Stages 9 & 10: Score Aggregation...');
+  // ── Stages 11 & 12: Pillar & Overall Aggregation ───────────────────────────
+  const tAggStart = Date.now();
+  debugLog('Executing Stages 11 & 12: Score Aggregation...');
   const aggregationConfig = {
     pillars: Object.keys(config.questions),
     rounding: { decimals: 2 },
   };
   const pillarScores = calculatePillarScores(questionScores, aggregationConfig);
   const overallScore = calculateOverallScore(pillarScores, aggregationConfig);
-  const stage9Dur = timer.stop();
-  stages.push(recordStageTrace('score-aggregator', stage9Dur, 'success'));
+  const tAggEnd = Date.now();
 
-  // ── Stage 11: Grade Engine ──────────────────────────────────────────────────
-  timer.start();
-  debugLog('Executing Stage 11: Grade Evaluation...');
+  // Record Pillar Scores & Overall Score separately to match sequence
+  stages.push(recordStageTrace('Pillar Scores', makeTiming(tAggStart, tAggEnd), 'PASS', 'PASS'));
+  stages.push(recordStageTrace('Overall Score', makeTiming(tAggStart, tAggEnd), 'PASS', 'PASS'));
+
+  // ── Stage 13: Grade Engine ──────────────────────────────────────────────────
+  const tGradeStart = Date.now();
+  debugLog('Executing Stage 13: Grade Evaluation...');
   const gradeResult = calculateGrade(overallScore.percentage, config);
-  const stage11Dur = timer.stop();
-  stages.push(recordStageTrace('grade-engine', stage11Dur, 'success'));
+  const tGradeEnd = Date.now();
+  stages.push(recordStageTrace('Grade', makeTiming(tGradeStart, tGradeEnd), 'PASS', 'PASS'));
 
-  // ── Stage 12: Timing & Debug Trace ──────────────────────────────────────────
-  timer.start();
-  debugLog('Executing Stage 12: Debug Trace Compilation...');
+  // Stage 14: Audit Completed (Timing marker)
+  const tCompleted = Date.now();
+  stages.push(recordStageTrace('Audit Completed', makeTiming(tCompleted, tCompleted), 'PASS', 'PASS'));
+
+  // Assemble Debug Trace
   const questionTrace = ruleResults.flatMap(r =>
     r.evaluationTrace.map(msg => ({ questionId: r.questionId, stepName: 'Rule Match', logMessage: msg })),
   );
   const trace = buildAuditTrace(auditId, config, stages, questionTrace);
-  const stage12Dur = timer.stop();
-  stages.push(recordStageTrace('audit-trace', stage12Dur, 'success'));
 
-  // ── Stage 13: Gemini Recommendation Generator ───────────────────────────────
-  timer.start();
-  debugLog('Executing Stage 13: Recommendation Generation...');
+  // ── Stage 13 (UI): Gemini Recommendation Generator ──────────────────────────
+  debugLog('Executing Recommendations phase...');
   const recommendations = await generateRecommendations(
     overallScore,
     gradeResult,
@@ -166,13 +181,10 @@ export async function runAuditPipelineV3(
     config,
     apiKey,
   );
-  const stage13Dur = timer.stop();
-  stages.push(recordStageTrace('recommendation-engine', stage13Dur, 'success'));
 
-  // ── Stage 14: Report Builder ────────────────────────────────────────────────
+  // ── Stage 14 (UI): Report Builder ───────────────────────────────────────────
   const executionDuration = Date.now() - pipelineStartTime;
-  timer.start();
-  debugLog('Executing Stage 14: Report Builder...');
+  debugLog('Executing Report Builder...');
   const report = buildAuditReport({
     auditId,
     overallScore,
@@ -185,11 +197,10 @@ export async function runAuditPipelineV3(
     config,
     executionDuration,
   });
-  const stage14Dur = timer.stop();
-  stages.push(recordStageTrace('report-builder', stage14Dur, 'success'));
 
   debugLog(`V3 Pipeline Executed Successfully | Overall Duration: ${executionDuration}ms`);
   debugGroupEnd();
 
   return report;
 }
+

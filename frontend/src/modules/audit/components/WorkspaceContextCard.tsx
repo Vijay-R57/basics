@@ -7,7 +7,7 @@
  */
 
 import { useState, useEffect } from 'react';
-import { MapPin, Layers, Building2, ChevronDown, CheckCircle2 } from 'lucide-react';
+import { MapPin, Building2, ChevronDown, CheckCircle2 } from 'lucide-react';
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -30,18 +30,17 @@ interface Props {
 }
 
 export default function WorkspaceContextCard({ defaultIndustry = '', onContextChange }: Props) {
-  const [zone,          setZone]          = useState<string>('');
-  const [workspaceType, setWorkspaceType] = useState<WorkspaceType | ''>('');
-  const [industry,      setIndustry]      = useState(defaultIndustry);
+  const [zone,     setZone]     = useState<string>('');
+  const [industry, setIndustry] = useState(defaultIndustry);
 
   // Notify parent whenever context is complete
   useEffect(() => {
-    if (zone && workspaceType && industry.trim()) {
-      onContextChange({ selectedZone: zone, workspaceType: workspaceType as WorkspaceType, industry: industry.trim() });
+    if (zone && industry.trim()) {
+      onContextChange({ selectedZone: zone, workspaceType: 'General', industry: industry.trim() });
     }
-  }, [zone, workspaceType, industry, onContextChange]);
+  }, [zone, industry, onContextChange]);
 
-  const isComplete = !!(zone && workspaceType && industry.trim());
+  const isComplete = !!(zone && industry.trim());
 
   return (
     <div className="bg-card border border-border rounded-xl shadow-sm overflow-hidden">
@@ -99,60 +98,23 @@ export default function WorkspaceContextCard({ defaultIndustry = '', onContextCh
         {/* Zone preview — animates in when zone selected */}
         {zone && <ZonePreviewPanel zone={zone} />}
 
-        {/* Workspace Type + Industry — row */}
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-          {/* Workspace Type */}
-          <div className="space-y-2">
-            <label className="text-xs font-bold uppercase tracking-wider text-muted-foreground flex items-center gap-1.5">
-              <Layers className="h-3.5 w-3.5 text-primary" />
-              Workspace Type <span className="text-destructive">*</span>
-            </label>
-            <DropdownMenu>
-              <DropdownMenuTrigger asChild>
-                <button
-                  id="workspace-type-selector"
-                  className={`w-full flex items-center justify-between rounded-lg border px-4 py-3 text-sm font-semibold transition-all outline-none
-                    ${workspaceType
-                      ? 'border-primary/40 bg-primary/5 text-foreground'
-                      : 'border-border bg-background text-muted-foreground hover:border-primary/30'
-                    }`}
-                >
-                  <span className="truncate">{workspaceType || 'Select type…'}</span>
-                  <ChevronDown className="h-4 w-4 text-muted-foreground shrink-0 ml-2" />
-                </button>
-              </DropdownMenuTrigger>
-              <DropdownMenuContent className="w-[280px]" align="start">
-                {WORKSPACE_TYPE_OPTIONS.map((t) => (
-                  <DropdownMenuItem
-                    key={t}
-                    onClick={() => setWorkspaceType(t)}
-                    className={workspaceType === t ? 'bg-primary/10 text-primary font-bold' : ''}
-                  >
-                    {t}
-                  </DropdownMenuItem>
-                ))}
-              </DropdownMenuContent>
-            </DropdownMenu>
-          </div>
-
-          {/* Industry */}
-          <div className="space-y-2">
-            <label
-              htmlFor="industry-input"
-              className="text-xs font-bold uppercase tracking-wider text-muted-foreground flex items-center gap-1.5"
-            >
-              <Building2 className="h-3.5 w-3.5 text-primary" />
-              Industry / Sector <span className="text-destructive">*</span>
-            </label>
-            <input
-              id="industry-input"
-              type="text"
-              value={industry}
-              onChange={(e) => setIndustry(e.target.value)}
-              placeholder="e.g. Chemical Manufacturing"
-              className="w-full rounded-lg border border-border bg-background px-4 py-3 text-sm font-semibold text-foreground placeholder:text-muted-foreground/60 focus:outline-none focus:ring-2 focus:ring-primary/30 focus:border-primary/40 transition-all"
-            />
-          </div>
+        {/* Industry Sector Input (Aligned full-width like Audit Zone) */}
+        <div className="space-y-2">
+          <label
+            htmlFor="industry-input"
+            className="text-xs font-bold uppercase tracking-wider text-muted-foreground flex items-center gap-1.5"
+          >
+            <Building2 className="h-3.5 w-3.5 text-primary" />
+            Industry / Sector <span className="text-destructive">*</span>
+          </label>
+          <input
+            id="industry-input"
+            type="text"
+            value={industry}
+            onChange={(e) => setIndustry(e.target.value)}
+            placeholder="e.g. Chemical Manufacturing"
+            className="w-full rounded-lg border border-border bg-background px-4 py-3 text-sm font-semibold text-foreground placeholder:text-muted-foreground/60 focus:outline-none focus:ring-2 focus:ring-primary/30 focus:border-primary/40 transition-all"
+          />
         </div>
 
         {/* Completion indicator */}

@@ -97,6 +97,7 @@ export interface AuditItemResponse {
   notes:             string | null;
   created_at:        string;
   updated_at:        string;
+  evidenceSource?:   'IMAGE' | 'USER';
 }
 
 // ── Critical Rules (Refinement #5) ───────────────────────────────────────────
@@ -303,6 +304,7 @@ export interface FutureAuditQuestion {
   evidence: string;
   reason: string;
   supportingObservation?: string;
+  evidenceSource?: 'IMAGE' | 'USER';
 }
 
 export interface FuturePillar {

@@ -125,34 +125,18 @@ export function useAnalysisPipeline(officeName: string) {
         setStage('recommendations', 92, 'Processing improvement recommendations…');
         await delay(200);
 
-        // Stage — Save log
-        setStage('saving', 97, 'Saving audit record…');
-        const bypass = import.meta.env.VITE_BYPASS_SUPABASE_FUNCTIONS === 'true';
-        if (employee && !bypass) {
-          supabase.functions
-            .invoke('save-analysis-log', {
-              body: {
-                employeeId:     employee.employeeId,
-                employeeName:   employee.name,
-                department:     employee.department,
-                officeName,
-                beforeImage,
-                analysisResult: data,
-                scoringMethod:  'AI Audit V2 (Rating-Based)',
-                capturedAt:     new Date().toISOString(),
-              },
-            })
-            .then(({ error: logErr }: { error: any }) => {
-              if (logErr) console.error('[useAnalysisPipeline] Log save failed:', logErr);
-            })
-            .catch((e: any) => console.error('[useAnalysisPipeline] Log save error:', e));
-        } else if (employee && bypass) {
-          console.log('[useAnalysisPipeline] Bypassed remote log saving (Local Mode)');
+        const hasPending = data.before.responses.some(
+          r => r.evidence === 'Cannot be determined from the provided image.',
+        );
+
+        if (!hasPending) {
+          await saveAuditLog(data, beforeImage);
+        } else {
+          setStage('complete', 100, 'Analysis complete');
         }
 
         setResults(data);
         setTimestamp(new Date().toISOString());
-        setStage('complete', 100, 'Analysis complete');
 
         toast({
           title:       'Analysis Complete',
@@ -173,6 +157,41 @@ export function useAnalysisPipeline(officeName: string) {
     [employee, officeName, setStage, toast],
   );
 
+  const saveAuditLog = useCallback(
+    async (finalResult: AuditAnalysisResult, beforeImage: string) => {
+      setStage('saving', 97, 'Saving audit record…');
+      const bypass = import.meta.env.VITE_BYPASS_SUPABASE_FUNCTIONS === 'true';
+      if (employee && !bypass) {
+        try {
+          const { error: logErr } = await supabase.functions.invoke('save-analysis-log', {
+            body: {
+              employeeId:     employee.employeeId,
+              employeeName:   employee.name,
+              department:     employee.department,
+              officeName,
+              beforeImage,
+              analysisResult: finalResult,
+              scoringMethod:  'AI Audit V2 (Rating-Based)',
+              capturedAt:     new Date().toISOString(),
+            },
+          });
+          if (logErr) throw logErr;
+        } catch (e: any) {
+          console.error('[useAnalysisPipeline] Log save error:', e);
+          toast({
+            title:       'Error Saving Log',
+            description: e.message || 'Failed to save audit record',
+            variant:     'destructive',
+          });
+        }
+      } else if (employee && bypass) {
+        console.log('[useAnalysisPipeline] Bypassed remote log saving (Local Mode)');
+      }
+      setStage('complete', 100, 'Analysis complete');
+    },
+    [employee, officeName, setStage, toast],
+  );
+
   const reset = useCallback(() => {
     abortRef.current = true;
     setResults(null);
@@ -180,7 +199,7 @@ export function useAnalysisPipeline(officeName: string) {
     setPipeline({ stage: 'idle', progress: 0, message: '', retryCount: 0 });
   }, []);
 
-  return { pipeline, results, analysisTimestamp, runAnalysis, reset };
+  return { pipeline, results, analysisTimestamp, runAnalysis, saveAuditLog, reset };
 }
 
 // ── Analysis invocation ───────────────────────────────────────────────────────

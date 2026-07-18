@@ -55,7 +55,7 @@ import {
 const GEMINI_MODEL = 'gemini-2.5-flash';
 
 /** Fallback model used on the single retry attempt. */
-const GEMINI_RETRY_MODEL = 'gemini-1.5-flash';
+const GEMINI_RETRY_MODEL = 'gemini-1.5-flash-latest';
 
 // ── Internal types for parsed Gemini response ─────────────────────────────────
 

@@ -19,10 +19,11 @@ export type Severity = 'CRITICAL' | 'MAJOR' | 'MINOR';
 
 // ── Per-question AI response ──────────────────────────────────────────────────
 export interface AuditQuestionResponse {
-  question_id:  string;
-  ai_answer:    AuditAnswerState;
-  confidence:   number;   // metadata only — never used in scoring
-  evidence:     string;   // observation supporting the answer
+  question_id:     string;
+  ai_answer:       AuditAnswerState;
+  confidence:      number;   // metadata only — never used in scoring
+  evidence:        string;   // observation supporting the answer
+  evidenceSource?: 'IMAGE' | 'USER';
 }
 
 // ── Explainability detail per deduction ──────────────────────────────────────

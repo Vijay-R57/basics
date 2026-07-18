@@ -14,7 +14,10 @@ import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/contexts/AuthContext";
 import { useAnalysisPipeline } from "@/hooks/useAnalysisPipeline";
 import arcolabLogoSrc from "@/assets/arcolab-logo.png";
-import type { ImageValidationResult, AuditTimeline } from "@/types/analysis";
+import type { ImageValidationResult, AuditTimeline, AuditAnalysisResult } from "@/types/analysis";
+import AdditionalAuditInfoPanel from "@/modules/audit/components/AdditionalAuditInfoPanel";
+import { recalculateSessionScore, type AiRating } from "@/modules/audit/pipeline/scoreUtils";
+import { getAllQuestions } from "@/modules/audit/pipeline/questions";
 
 // Loads Arcolab logo as an Image element (cached after first load)
 let cachedLogo: HTMLImageElement | null = null;
@@ -139,8 +142,13 @@ const Analysis = () => {
   const { employee, office } = useAuth();
 
   const officeName = office?.name ?? "Unknown Office";
-  const { pipeline, results, analysisTimestamp, runAnalysis, reset } = useAnalysisPipeline(officeName);
+  const { pipeline, results, analysisTimestamp, runAnalysis, saveAuditLog, reset } = useAnalysisPipeline(officeName);
   const loading = pipeline.stage !== "idle" && pipeline.stage !== "complete" && pipeline.stage !== "error";
+
+  // Local results and pending questions states
+  const [localResults, setLocalResults] = useState<AuditAnalysisResult | null>(null);
+  const [pendingQuestions, setPendingQuestions] = useState<any[]>([]);
+  const [showQuestionnaire, setShowQuestionnaire] = useState(false);
 
   const handleGeoDenied = useCallback(() => {
     setGeoError("Location access is required for 5S audit compliance. Please enable location permissions and try again.");
@@ -248,18 +256,109 @@ const Analysis = () => {
   // Sync completion stage and results mapping with state machine
   useEffect(() => {
     if (pipeline.stage === 'complete' && results && sessionState === 'AUDIT_RUNNING') {
-      const now = new Date().toISOString();
-      setTimeline(prev => ({
-        ...prev,
-        auditCompleted: now,
-        reportGenerated: now,
-      }));
-      setSessionState('AUDIT_COMPLETE');
+      // Check for pending questions
+      const pending = results.before.responses.filter(
+        r => r.evidence === 'Cannot be determined from the provided image.'
+      ).map(r => {
+        const qDef = getAllQuestions().find(q => q.id === r.question_id);
+        return {
+          question_id: r.question_id,
+          pillar: qDef?.pillar ?? 'SORT',
+          question: qDef?.question ?? '',
+          rating: 'AVERAGE',
+          score: (r as any).score ?? 2,
+          reason: r.evidence,
+          evidence: r.evidence,
+        };
+      });
+
+      if (pending.length === 0) {
+        // No-Question Flow: immediately complete
+        setLocalResults(results);
+        const now = new Date().toISOString();
+        setTimeline(prev => ({
+          ...prev,
+          auditCompleted: now,
+          reportGenerated: now,
+        }));
+        setSessionState('AUDIT_COMPLETE');
+      } else {
+        // Pause before report generation, show questionnaire
+        setPendingQuestions(pending);
+        setShowQuestionnaire(true);
+      }
     }
   }, [pipeline.stage, results, sessionState]);
 
+  const handleFinishQuestionnaire = async (answers: Array<{ questionId: string; rating: AiRating; remarks: string }>) => {
+    if (!results) return;
+
+    const ratingToScoreMap: Record<AiRating, number> = {
+      VERY_GOOD: 4,
+      GOOD: 3,
+      AVERAGE: 2,
+      BAD: 1,
+      VERY_BAD: 0,
+    };
+
+    // Update ONLY the affected questions, preserve all other questions
+    const updatedResponses = results.before.responses.map(r => {
+      const answer = answers.find(a => a.questionId === r.question_id);
+      if (answer) {
+        const score = ratingToScoreMap[answer.rating];
+        const ai_answer = score >= 3 ? 'YES' : score === 2 ? 'PARTIAL' : 'NO';
+        const reasonText = answer.remarks && answer.remarks.trim() !== ''
+          ? answer.remarks.trim()
+          : 'User confirmed this assessment during the additional audit questionnaire.';
+        
+        return {
+          ...r,
+          ai_answer,
+          score,
+          reason: reasonText,
+          evidence: reasonText,
+          evidenceSource: 'USER',
+        };
+      }
+      return {
+        ...r,
+        evidenceSource: 'IMAGE', // preserve and explicitly set as IMAGE
+      };
+    });
+
+    // Recalculate scores deterministically
+    const recalculatedScore = recalculateSessionScore(updatedResponses);
+
+    // Create the final results object
+    const updatedResults: AuditAnalysisResult = {
+      ...results,
+      before: {
+        score: recalculatedScore,
+        responses: updatedResponses,
+      },
+    };
+
+    // Save log using the updated result
+    await saveAuditLog(updatedResults, workplaceImage!);
+
+    // Update state to render results
+    setLocalResults(updatedResults);
+    setShowQuestionnaire(false);
+    
+    const now = new Date().toISOString();
+    setTimeline(prev => ({
+      ...prev,
+      auditCompleted: now,
+      reportGenerated: now,
+    }));
+    setSessionState('AUDIT_COMPLETE');
+  };
+
   const handleNewAudit = () => {
     reset();
+    setLocalResults(null);
+    setPendingQuestions([]);
+    setShowQuestionnaire(false);
     setRawImage(null);
     setWorkplaceImage(null);
     setImageGeo(null);
@@ -341,7 +440,7 @@ const Analysis = () => {
             )}
 
             {/* Step 2: Workspace Context Selection */}
-            {employee && (
+            {employee && !showQuestionnaire && (
               <WorkspaceContextCard
                 defaultIndustry={employee.department || ''}
                 onContextChange={handleContextChange}
@@ -349,7 +448,7 @@ const Analysis = () => {
             )}
 
             {/* Step 3: Upload Current Workplace Image */}
-            {sessionState !== 'SESSION_SETUP' && (
+            {sessionState !== 'SESSION_SETUP' && !showQuestionnaire && (
               <div className="bg-card border border-border rounded-xl p-5 shadow-sm space-y-4">
                 <div className="flex items-center justify-between border-b border-border pb-3">
                   <h3 className="text-sm font-black text-foreground flex items-center gap-2">
@@ -372,7 +471,7 @@ const Analysis = () => {
             )}
 
             {/* Step 4: Image Quality Validation */}
-            {workplaceImage && (sessionState === 'IMAGE_READY' || sessionState === 'IMAGE_VALIDATED') && (
+            {workplaceImage && (sessionState === 'IMAGE_READY' || sessionState === 'IMAGE_VALIDATED') && !showQuestionnaire && (
               <ImageValidationPanel
                 imageBase64={workplaceImage}
                 onValidation={handleValidation}
@@ -380,7 +479,7 @@ const Analysis = () => {
             )}
 
             {/* Step 5: Action Button (Start / Reset) */}
-            {sessionState !== 'SESSION_SETUP' && (
+            {sessionState !== 'SESSION_SETUP' && !showQuestionnaire && (
               <div className="flex gap-3">
                 {sessionState !== 'AUDIT_COMPLETE' ? (
                   <button
@@ -413,15 +512,25 @@ const Analysis = () => {
             )}
 
             {/* Progress Panel */}
-            {sessionState === 'AUDIT_RUNNING' && (
+            {sessionState === 'AUDIT_RUNNING' && !showQuestionnaire && (
               <AuditExecutionPanel pipeline={pipeline} results={results} />
             )}
 
+            {/* Questionnaire Panel */}
+            {showQuestionnaire && pendingQuestions.length > 0 && (
+              <div className="pt-4 animate-fade-in">
+                <AdditionalAuditInfoPanel
+                  pendingQuestions={pendingQuestions}
+                  onFinish={handleFinishQuestionnaire}
+                />
+              </div>
+            )}
+
             {/* Step 6 & 7: Audit Report & Results */}
-            {results && workplaceImage && (sessionState === 'AUDIT_COMPLETE' || sessionState === 'REPORT_READY') && (
+            {localResults && workplaceImage && (sessionState === 'AUDIT_COMPLETE' || sessionState === 'REPORT_READY') && (
               <div className="animate-fade-in pt-4">
                 <AnalysisResults
-                  data={results}
+                  data={localResults}
                   workplaceImage={workplaceImage}
                   analysisTimestamp={analysisTimestamp || undefined}
                   imageQualityScore={validationResult?.qualityScore}

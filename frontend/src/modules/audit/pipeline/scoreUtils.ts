@@ -10,6 +10,9 @@
  *  - No side effects. No Gemini calls. No database calls.
  */
 
+import type { PillarScoreResult, SessionScoreResult, AuditQuestionResponse } from '@/types/analysis';
+import type { AuditPillar } from '../constants/pillars';
+
 // ── Valid AI Rating type ───────────────────────────────────────────────────────
 
 export type AiRating = 'VERY_GOOD' | 'GOOD' | 'AVERAGE' | 'BAD' | 'VERY_BAD';
@@ -131,4 +134,104 @@ export function averageConfidence(confidenceValues: number[]): number | null {
   if (confidenceValues.length === 0) return null;
   const avg = confidenceValues.reduce((a, b) => a + b, 0) / confidenceValues.length;
   return Math.round(avg);
+}
+
+/**
+ * Recalculates SessionScoreResult based on updated question responses deterministically.
+ */
+export function recalculateSessionScore(
+  responses: AuditQuestionResponse[]
+): SessionScoreResult {
+  const PILLAR_ORDER: AuditPillar[] = ['SORT', 'SET_IN_ORDER', 'SHINE', 'STANDARDIZE', 'SUSTAIN'];
+  const PILLAR_LABEL: Record<AuditPillar, string> = {
+    SORT:         'Sort',
+    SET_IN_ORDER: 'Set in Order',
+    SHINE:        'Shine',
+    STANDARDIZE:  'Standardize',
+    SUSTAIN:      'Sustain',
+  };
+
+  const getPillarFromQuestionId = (id: string): AuditPillar => {
+    if (id.startsWith('SORT_')) return 'SORT';
+    if (id.startsWith('SET_')) return 'SET_IN_ORDER';
+    if (id.startsWith('SHINE_')) return 'SHINE';
+    if (id.startsWith('STAND_') || id.startsWith('STANDARDIZE_')) return 'STANDARDIZE';
+    if (id.startsWith('SUSTAIN_')) return 'SUSTAIN';
+    return 'SORT';
+  };
+
+  const responsesByPillar: Record<AuditPillar, AuditQuestionResponse[]> = {
+    SORT: [],
+    SET_IN_ORDER: [],
+    SHINE: [],
+    STANDARDIZE: [],
+    SUSTAIN: [],
+  };
+
+  responses.forEach((r) => {
+    const pKey = getPillarFromQuestionId(r.question_id);
+    responsesByPillar[pKey].push(r);
+  });
+
+  let totalScore = 0;
+  let totalCritical = 0;
+
+  const pillarScores: PillarScoreResult[] = PILLAR_ORDER.map((pKey) => {
+    const pResps = responsesByPillar[pKey];
+    let score = 0;
+    let passed = 0;
+    let partial = 0;
+    let failed = 0;
+    let critical = 0;
+
+    pResps.forEach((r) => {
+      const questionScore = (r as any).score ?? 0;
+      score += questionScore;
+      if (questionScore >= 3) passed++;
+      else if (questionScore === 2) partial++;
+      else {
+        failed++;
+        if (questionScore === 0) critical++;
+      }
+    });
+
+    totalScore += score;
+    totalCritical += critical;
+
+    const percentage = Math.round((score / 16) * 100);
+
+    return {
+      pillar:         PILLAR_LABEL[pKey] as any,
+      score,
+      maximum:        16,
+      percentage,
+      raw_percentage: percentage,
+      passed,
+      partial,
+      failed,
+      not_visible:    0,
+      not_applicable: 0,
+      critical,
+      cap_applied:    false,
+      top_deductions: [],
+    };
+  });
+
+  const overallScore = totalScore;
+  const overallMax = 80;
+  const overallPercentage = Math.round((overallScore / overallMax) * 100);
+  const grade = calculateGradeLabel(overallPercentage);
+
+  return {
+    pillar_scores:      pillarScores,
+    overall_score:      overallScore,
+    overall_maximum:    overallMax,
+    overall_percentage: overallPercentage,
+    grade,
+    grade_color:        gradeColor(grade),
+    total_answered:     responses.length,
+    total_questions:    responses.length,
+    critical_failures:  totalCritical,
+    computed_at:        new Date().toISOString(),
+  };
 }

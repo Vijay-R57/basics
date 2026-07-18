@@ -127,6 +127,7 @@ export function mapSessionToAuditResult(
         evidence,
         reason,
         supportingObservation: evidence,
+        evidenceSource:       (resp as any)?.evidenceSource ?? 'IMAGE',
       };
     });
 
@@ -273,6 +274,7 @@ export function mapAnalysisResultToAuditResult(
         evidence,
         reason,
         supportingObservation: evidence,
+        evidenceSource:        (resp as any)?.evidenceSource ?? 'IMAGE',
       };
     });
 

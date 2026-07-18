@@ -626,17 +626,8 @@ export default function AnalysisResults({
             </div>
           </div>
 
-          {data.raw_gemini_response && (
-            <div className="space-y-1">
-              <p className="text-[10px] text-muted-foreground font-bold uppercase text-amber-500">Original Raw Gemini Response (Pre-Scoring/Pre-Questionnaire)</p>
-              <pre className="bg-muted p-4 rounded-lg overflow-x-auto max-h-60 text-[10px] border border-border">
-                {JSON.stringify(data.raw_gemini_response, null, 2)}
-              </pre>
-            </div>
-          )}
-
           <div className="space-y-1">
-            <p className="text-[10px] text-muted-foreground font-bold uppercase">Final Recalculated JSON Payload</p>
+            <p className="text-[10px] text-muted-foreground font-bold uppercase">Raw JSON Payload</p>
             <pre className="bg-muted p-4 rounded-lg overflow-x-auto max-h-60 text-[10px] border border-border">
               {JSON.stringify(data, null, 2)}
             </pre>

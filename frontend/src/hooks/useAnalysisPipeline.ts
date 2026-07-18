@@ -110,7 +110,7 @@ export function useAnalysisPipeline(officeName: string) {
 
         let data: AuditAnalysisResult;
         try {
-          data = await invokeAnalysis(compBefore, workspaceContext);
+          data = await invokeAnalysis(compBefore, officeName, workspaceContext);
         } finally {
           clearInterval(stageInterval);
         }
@@ -217,9 +217,14 @@ export function useAnalysisPipeline(officeName: string) {
  */
 async function invokeAnalysis(
   imageBase64: string,
+  officeName: string,
   workspaceContext?: Record<string, unknown>,
 ): Promise<AuditAnalysisResult> {
   const bypass = import.meta.env.VITE_BYPASS_SUPABASE_FUNCTIONS === 'true';
+  const extendedContext = {
+    ...workspaceContext,
+    officeName,
+  };
 
   // Try Supabase Edge Function first (when not bypassed)
   if (!bypass) {
@@ -227,7 +232,7 @@ async function invokeAnalysis(
       const { data, error } = await supabase.functions.invoke('analyze-5s', {
         body: {
           beforeImage:      imageBase64,
-          workspaceContext: workspaceContext ?? undefined,
+          workspaceContext: extendedContext,
           skipImageGen:     true,
         },
       });
@@ -283,7 +288,7 @@ async function invokeAnalysis(
 
   console.log('[useAnalysisPipeline] Running direct Gemini API analysis…');
   // runAuditPipeline handles its own single retry internally
-  return runAuditPipeline(imageBase64, apiKey, workspaceContext);
+  return runAuditPipeline(imageBase64, apiKey, extendedContext);
 }
 
 // ── Helpers ───────────────────────────────────────────────────────────────────

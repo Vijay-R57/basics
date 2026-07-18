@@ -110,13 +110,20 @@ function formatQuestionBlock(q: AuditQuestion, index: number): string {
   return lines.join('\n');
 }
 
-function buildPrompt(): string {
+function buildPrompt(workspaceContext?: Record<string, unknown>): string {
   const pillarSections = PILLAR_ORDER.map(pillarKey => {
     const pillarLabel = pillarKey === 'SET_IN_ORDER' ? 'SET IN ORDER' : pillarKey;
     const questions = AUDIT_QUESTIONS[pillarKey];
     const questionBlocks = questions.map((q, i) => formatQuestionBlock(q, i)).join('\n');
     return `${pillarLabel}:\n${questionBlocks}`;
   }).join('\n\n');
+
+  // Extract variables with fallbacks
+  const injectedAuditZone = (workspaceContext?.selectedZone as string) || 'General';
+  const injectedWorkspaceType = (workspaceContext?.workspaceType as string) || 'General';
+  const injectedIndustry = (workspaceContext?.industry as string) || 'General Industrial';
+  const injectedOfficeName = (workspaceContext?.officeName as string) || 'Unknown Office';
+  const injectedZoneName = (workspaceContext?.selectedZone as string) || 'Unspecified Zone';
 
   return `You are an experienced industrial 5S auditor with decades of field experience.
 
@@ -131,6 +138,16 @@ CRITICAL RULES:
 - confidence MUST be an integer from 0 to 100 representing your certainty.
 - Do NOT calculate any scores, percentages, or grades — the application handles all calculations.
 - Do NOT invent objects not visible in the image.
+- Audit Zone Interpretation Rule
+  Audit Zone Context Rules
+  Use the provided Audit Zone only to understand the operational purpose of the workplace being evaluated.
+  The Audit Zone provides contextual understanding of the workspace and should help interpret the environment appropriately.
+  However:
+  • Never use the Audit Zone itself as evidence.
+  • Never assume equipment, tools, safety devices, labels, documents, machinery, storage systems, or workplace features exist simply because they are commonly expected within that Audit Zone.
+  • Never assume something is missing solely because it is normally expected within that Audit Zone.
+  • Every rating, reason, confidence level, observation, and recommendation must be supported only by visually observable evidence contained in the uploaded image.
+  If sufficient visual evidence is unavailable, follow the existing uncertainty rules exactly.
 - If a question includes an "If uncertain" directive, follow it exactly when evidence is insufficient.
 - Otherwise, if a question cannot be assessed: rating="AVERAGE", confidence=30, reason="Cannot be determined from the provided image."
 
@@ -142,11 +159,46 @@ SORT EVALUATION RULES:
 - Only classify something as unnecessary when there is visible evidence that it creates clutter, appears abandoned, is unrelated to the workplace, occupies valuable workspace unnecessarily, or is obviously stored improperly.
 - Every reason must reference specific visible evidence.
 
-QUESTIONS TO EVALUATE:
+## WORKSPACE CONTEXT
+Audit Zone:
+${injectedAuditZone}
+
+Workspace Type:
+${injectedWorkspaceType}
+
+Industry:
+${injectedIndustry}
+
+Facility / Office:
+${injectedOfficeName}
+
+Area / Station:
+${injectedZoneName}
+
+Context Guidance
+This workplace belongs to the Audit Zone shown above.
+Use this information only to understand the operational purpose of the workplace.
+Do not treat this context as visual evidence.
+Visible observations always take precedence over contextual expectations.
+If the uploaded image does not visibly contain sufficient evidence for a particular assessment, follow the existing uncertainty rules without making assumptions.
+
+## QUESTIONS TO EVALUATE:
 
 ${pillarSections}
 
-Optionally, provide a recommendations array for areas needing corrective action.
+Recommendation Rules
+Generate recommendations only for issues that are visually observed within the uploaded image.
+When generating recommendations, consider the operational purpose of the Audit Zone so that recommendations are appropriate for that type of workplace.
+However:
+• Never recommend correcting equipment, safety devices, documents, labels, storage systems, or workplace features that cannot be visually confirmed.
+• Never recommend adding something solely because it is commonly expected in that Audit Zone.
+• Every recommendation must directly correspond to a visually observed issue identified during the audit.
+Recommendations should remain:
+• Specific
+• Practical
+• Actionable
+• Relevant to the observed workplace
+Avoid generic recommendations whenever possible.
 
 Return this exact JSON structure:
 {
@@ -478,7 +530,6 @@ function buildAuditAnalysisResult(
   allConfidences: Array<number | null>,
   rawRecommendations: GeminiRawRecommendation[],
   modelName:      string,
-  rawResponse:    any,
 ): AuditAnalysisResult {
   // ── Debug: Question evaluations (details per question) ───────────────────
   debugGroup('Question Evaluations');
@@ -607,7 +658,6 @@ function buildAuditAnalysisResult(
     improvement_prompt:    null,
     explainability_report: null,
     scoringMethod:         'AI Audit V2 (Rating-Based)',
-    raw_gemini_response:   rawResponse,
   };
 }
 
@@ -631,7 +681,7 @@ export async function runAuditPipeline(
 ): Promise<AuditAnalysisResult> {
   const modelName  = attempt === 0 ? GEMINI_MODEL : GEMINI_RETRY_MODEL;
   const startTime  = Date.now();
-  const prompt     = buildPrompt();
+  const prompt     = buildPrompt(workspaceContext);
 
   // ── Debug: Pipeline Started ───────────────────────────────────────────────
   if (attempt === 0) {
@@ -709,7 +759,6 @@ export async function runAuditPipeline(
     allConfidences,
     rawRecommendations,
     modelName,
-    parsed,
   );
 
   // ── Debug: Pipeline Finished ──────────────────────────────────────────────

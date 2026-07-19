@@ -563,10 +563,133 @@ Follow this strict sequence for every single question:
    - Read the question-specific "Evaluate" guidance.
    - Read the question-specific "Ignore" guidance.
    - Read the question-specific "Notes" guidance.
-   - Determine Rating (using visible absence if State 2).
+   - Execute the RATING DECISION FRAMEWORK (see below) to determine the rating.
    - Generate Reason (Observation -> Interpretation structure).
    - Assign Confidence (calibrated based on evidence).
    - Generate Recommendations (if applicable).
+
+RATING DECISION FRAMEWORK:
+The model must never directly choose a rating immediately after observing evidence.
+Every State 1 or State 2 question must pass through the following decision sequence in full before a rating is assigned.
+
+Stage 1 – Evidence Inventory (Internal Only)
+Immediately after normal evaluation begins, create an internal inventory of all visible evidence.
+Separate observations into two categories:
+- Positive Evidence: Visible observations supporting compliance (e.g. correctly labeled equipment, organized storage, accessible SOP, marked walkways, visible cleaning tools, standardized labels).
+- Negative Evidence: Visible observations indicating non-compliance (e.g. missing labels, clutter, dirty equipment, blocked walkways, overflowing waste, inaccessible documents, missing standards).
+RULE: Evidence Inventory is internal reasoning only. It must not appear in the final JSON.
+
+Stage 2 – Compliance Assessment (Internal Only)
+After completing the Evidence Inventory, determine the overall compliance state.
+Evaluate the overall workplace condition — do NOT count findings.
+Select exactly one of the following compliance states:
+
+  Compliance State 5 – Fully Compliant
+    Required system is fully implemented.
+    Evidence consistently supports compliance.
+    Only trivial cosmetic issues exist.
+    → Maps to VERY_GOOD
+
+  Compliance State 4 – Mostly Compliant
+    Required system is clearly implemented.
+    Minor deficiencies exist.
+    Workspace remains highly compliant.
+    → Maps to GOOD
+
+  Compliance State 3 – Partially Compliant
+    Required system exists only in part.
+    Compliance and non-compliance coexist.
+    Neither clearly dominates.
+    → Maps to AVERAGE
+
+  Compliance State 2 – Mostly Non-Compliant
+    Majority of required elements are missing.
+    Only isolated compliant observations exist.
+    Non-compliance dominates.
+    → Maps to BAD
+
+  Compliance State 1 – Critically Non-Compliant
+    Required system is essentially absent.
+    Severe deficiencies dominate.
+    Serious workplace risks or complete absence of standards are visible.
+    → Maps to VERY_BAD
+
+IMPORTANT: Compliance Assessment must evaluate the overall state of compliance.
+It must never be determined by counting positive versus negative observations.
+
+Stage 3 – Rating Mapping (Deterministic)
+Once the compliance state has been selected, assign the rating deterministically.
+The mapping is fixed and no alternative mappings are permitted:
+  Compliance State 5 → VERY_GOOD
+  Compliance State 4 → GOOD
+  Compliance State 3 → AVERAGE
+  Compliance State 2 → BAD
+  Compliance State 1 → VERY_BAD
+
+Stage 4 – Rating Validation Gate
+Before producing the final JSON, perform all four validations:
+  Validation 1: Does the selected rating match the observed compliance state?
+  Validation 2: Does the selected rating contradict any visible evidence?
+    If yes → re-evaluate the Compliance Assessment.
+  Validation 3: Would another adjacent rating better represent the observed workplace?
+    If yes → update the Compliance Assessment before returning the final JSON.
+  Validation 4: Does the selected rating comply with the official ARCOLAB rating definitions?
+    The final rating must remain consistent with existing definitions.
+    Do not reinterpret or redefine rating meanings.
+
+ADJACENT RATING BOUNDARY RULES:
+To reduce ambiguity at decision boundaries, apply these explicit rules:
+  VERY_GOOD vs GOOD
+    VERY_GOOD: System fully implemented. Only insignificant cosmetic observations.
+    GOOD: System clearly implemented. Minor deficiencies are visible but do not significantly affect compliance.
+  GOOD vs AVERAGE
+    GOOD: Positive evidence clearly outweighs deficiencies. Required system functions effectively.
+    AVERAGE: Compliance and non-compliance are relatively balanced. Improvement is clearly required.
+  AVERAGE vs BAD
+    AVERAGE: Required system is partially implemented. Meaningful compliance still exists.
+    BAD: Non-compliance clearly dominates. Only isolated compliant elements remain.
+  BAD vs VERY_BAD
+    BAD: Significant deficiencies exist. Some compliant elements remain visible.
+    VERY_BAD: Required system is essentially absent. Severe deficiencies dominate. Workplace condition demonstrates critical non-compliance.
+
+Stage 5 – Rating Drift Prevention Rule
+After successful completion of the Rating Validation Gate, apply this final consistency safeguard.
+
+PURPOSE:
+Reduce unnecessary rating variation across repeated executions when the observed workplace condition has not materially changed.
+
+RULE:
+If the current evaluation results in a materially equivalent Evidence Inventory and the same Compliance Assessment, the selected rating must remain unchanged unless the visible workplace evidence has materially changed.
+The model must not assign a different adjacent rating unless there is a meaningful change in the observed workplace evidence or the assessed compliance state.
+
+CLARIFICATION:
+This rule applies only to the rating. It does not require identical wording for evidence, reasoning, or recommendations. Minor differences in natural language are acceptable. Only the rating should remain stable when the underlying compliance assessment is unchanged.
+
+EXAMPLES:
+  Acceptable (rating must be identical):
+    Run 1 Evidence: "Machine labels missing."
+    Run 2 Evidence: "Most machines lack labels."
+    If both produce the same Compliance Assessment → rating must be identical.
+  Not acceptable (rating drift):
+    Run 1: Compliance Assessment = Mostly Non-Compliant → BAD
+    Run 2: Compliance Assessment = Mostly Non-Compliant → VERY_BAD
+    Without any meaningful change in visible evidence. This constitutes rating drift and must be avoided.
+
+RELATIONSHIP TO FRAMEWORK:
+The Rating Drift Prevention Rule does not replace Evidence Inventory, Compliance Assessment, Rating Mapping, or Rating Validation Gate. It reinforces the final output by ensuring that equivalent reasoning produces equivalent ratings.
+
+Full Rating Decision Framework execution sequence:
+  Evidence Inventory
+       ↓
+  Compliance Assessment
+       ↓
+  Rating Mapping
+       ↓
+  Rating Validation Gate
+       ↓
+  Rating Drift Prevention Rule
+       ↓
+  Return JSON
 
 PARTIAL VISIBILITY:
 - If only part of an object is visible (for example a machine, workstation, cabinet, shelf, production line, floor, wall, pipe, or storage rack), evaluate ONLY the visible portion. Do not infer the condition of hidden or partially obscured areas.
@@ -932,7 +1055,7 @@ function buildResult(
 
   return {
     template:          { id: "std-5s-v2", name: "Standard 5S Audit", version: "2.0.0" },
-    prompt_version:    "v2.0",
+    prompt_version:    "v3.2",
     vision_model:      modelName,
     schema_version:    "2.0",
     audit_confidence:  avgConf !== null ? avgConf / 100 : null,

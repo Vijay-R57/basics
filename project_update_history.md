@@ -26,6 +26,11 @@ timeline
     2026-07-19 : Phase 5: Prompt Refinement & Rating Documentation
                : - Integrated strict Uncertainty Contract rules in prompt
                : - Created detailed rating definitions and scoring maps
+    2026-07-19 : Phase 6: AI Engine V3.2 – Rating Decision Framework
+               : - Introduced structured Rating Decision Framework in prompt
+               : - Added 5-stage evaluation path: Evidence Inventory, Compliance Assessment, Rating Mapping, Rating Validation Gate, Rating Drift Prevention Rule
+               : - Added Adjacent Rating Boundary Rules for all four decision boundaries
+               : - Updated prompt_version metadata to v3.2
 ```
 
 ---
@@ -89,8 +94,23 @@ timeline
 
 ### 🔹 Phase 5: Prompt Refinement & Rating Documentation (July 19, 2026)
 * **Goal**: Establish strict Uncertainty Contract behavior in the Gemini prompt and compile comprehensive rating and scoring logic documentation.
-* **Commit Reference**: `7b12f5c`
+* **Commit Reference**: `d6df0d8`
 * **Key Achievements & Deliverables**:
   * **Prompt Refinement (Uncertainty Contract)**: Programmed strict average rating fallback rules when visual evidence is insufficient, preventing descriptive variance or overrides.
   * **Rating Definitions**: Created [rating_definitions.md](file:///c:/Users/Vijay%20Ramesh/5S/basics/rating_definitions.md) documenting VERY_GOOD, GOOD, AVERAGE, BAD, and VERY_BAD ratings, compliance answer mappings, and evidence consistency controls.
   * **Scoring Mapping**: Created [scoring_mapping.md](file:///c:/Users/Vijay%20Ramesh/5S/basics/scoring_mapping.md) documenting scoring conversions, pillar score calculations, overall score formulas, and grade/color thresholds.
+
+---
+
+### 🔹 Phase 6: AI Engine V3.2 – Rating Decision Framework (July 19, 2026)
+* **Goal**: Upgrade the ARCOLAB AI Engine from V3.1.1 to V3.2 by introducing a structured Rating Decision Framework to reduce rating inconsistency on identical or near-identical workplace evidence.
+* **Key Achievements & Deliverables**:
+  * **Rating Decision Framework**: Inserted a structured 5-stage reasoning path into the Gemini prompt that the model must complete before assigning any rating for State 1 or State 2 evaluations:
+    * **Stage 1 – Evidence Inventory**: Internal classification of all visible evidence into Positive and Negative categories (never surfaces in JSON output).
+    * **Stage 2 – Compliance Assessment**: Overall compliance state selection from five defined states (Fully Compliant → Critically Non-Compliant), explicitly prohibiting count-based rating decisions.
+    * **Stage 3 – Rating Mapping**: Deterministic fixed mapping from Compliance State to rating (no alternative mappings permitted).
+    * **Stage 4 – Rating Validation Gate**: Four-step pre-output validation ensuring rating–evidence consistency and preventing adjacent rating misclassification.
+    * **Stage 5 – Rating Drift Prevention Rule**: Final consistency safeguard ensuring equivalent Evidence Inventories and Compliance Assessments always produce the same rating across repeated executions.
+  * **Adjacent Rating Boundary Rules**: Introduced explicit decision boundary definitions for all four adjacent rating pairs (VERY_GOOD/GOOD, GOOD/AVERAGE, AVERAGE/BAD, BAD/VERY_BAD).
+  * **Prompt Version Metadata**: Updated `prompt_version` from `"v2.0"` to `"v3.2"` in `buildResult()` for production traceability and regression tracking.
+  * **Architecture Preservation**: Zero changes to the AI pipeline, Gemini API integration, Edge Function handler, JSON schema, response parser, validator, deterministic scoring, questionnaire definitions, Visibility Decision Rule, Uncertainty Contract, Immutable Uncertainty Contract Rule, recommendation generation, report generation, or PDF generation.

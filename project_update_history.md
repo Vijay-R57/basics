@@ -23,6 +23,9 @@ timeline
                : - Added Before/After Comparisons, Progress Tracking
                : - Calibrated metrics & removed false-positive obstructions
                : - Added Production DB architecture & resolved Employee login 500 errors
+    2026-07-19 : Phase 5: Prompt Refinement & Rating Documentation
+               : - Integrated strict Uncertainty Contract rules in prompt
+               : - Created detailed rating definitions and scoring maps
 ```
 
 ---
@@ -81,3 +84,13 @@ timeline
     * Resolved an **HTTP 500 error** in the `employee-login` edge function originating from a schema mismatch during table queries.
     * Standardized the API communication hook `useAnalysisPipeline` to handle state transitions smoothly.
     * Created `deterministic.test.ts` to ensure consistent execution.
+
+---
+
+### 🔹 Phase 5: Prompt Refinement & Rating Documentation (July 19, 2026)
+* **Goal**: Establish strict Uncertainty Contract behavior in the Gemini prompt and compile comprehensive rating and scoring logic documentation.
+* **Commit Reference**: `d6df0d8`
+* **Key Achievements & Deliverables**:
+  * **Prompt Refinement (Uncertainty Contract)**: Programmed strict average rating fallback rules when visual evidence is insufficient, preventing descriptive variance or overrides.
+  * **Rating Definitions**: Created [rating_definitions.md](file:///c:/Users/Vijay%20Ramesh/5S/basics/rating_definitions.md) documenting VERY_GOOD, GOOD, AVERAGE, BAD, and VERY_BAD ratings, compliance answer mappings, and evidence consistency controls.
+  * **Scoring Mapping**: Created [scoring_mapping.md](file:///c:/Users/Vijay%20Ramesh/5S/basics/scoring_mapping.md) documenting scoring conversions, pillar score calculations, overall score formulas, and grade/color thresholds.

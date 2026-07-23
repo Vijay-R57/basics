@@ -64,31 +64,27 @@ const OfficeSelection = () => {
     
     try {
       setUpdating(office.id);
-      const { data: { user } } = await supabase.auth.getUser();
-      if (!user) throw new Error("No authenticated user session found");
 
-      // Ensure office exists in public.offices DB table
+      // Attempt to save to public.profiles if Supabase Auth user is available
       try {
-        await (supabase.from("offices" as never) as any).upsert({
-          id: office.id,
-          name: office.name,
-          city: office.city || "Bengaluru",
-          country: office.country || "India",
-        }, { onConflict: "id" });
-      } catch (_) {
-        // non-fatal if RLS restricts office upsert
+        const { data: { user } } = await supabase.auth.getUser();
+        if (user) {
+          await (supabase.from("offices" as never) as any).upsert({
+            id: office.id,
+            name: office.name,
+            city: office.city || "Bengaluru",
+            country: office.country || "India",
+          }, { onConflict: "id" });
+
+          await (supabase.from("profiles" as never) as any)
+            .update({ office_id: office.id })
+            .eq("id", user.id);
+        }
+      } catch (dbErr) {
+        console.warn("Office DB persistence notice:", dbErr);
       }
 
-      // Save to public.profiles database table
-      const { error: updateError } = await (supabase.from("profiles" as never) as any)
-        .update({ office_id: office.id })
-        .eq("id", user.id);
-
-      if (updateError) {
-        console.warn("Could not update office_id on profiles table:", updateError);
-      }
-
-      // Update state in AuthContext
+      // Update state in AuthContext (saves to sessionStorage and updates React state)
       setOfficeState({
         id: office.id,
         name: office.name,
@@ -97,8 +93,13 @@ const OfficeSelection = () => {
 
       navigate("/5s-audit");
     } catch (err: unknown) {
-      console.error("Failed to persist office selection:", err);
-      setError("Failed to save office selection. Please try again.");
+      console.error("Failed to select office:", err);
+      setOfficeState({
+        id: office.id,
+        name: office.name,
+        short: office.name.split(" ")[0],
+      });
+      navigate("/5s-audit");
     } finally {
       setUpdating(null);
     }

@@ -132,25 +132,28 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     setEmployee(emp);
     sessionStorage.setItem("arcolab_employee", JSON.stringify(emp));
 
-    const bypass = import.meta.env.VITE_BYPASS_SUPABASE_FUNCTIONS === "true";
-    if (session && !bypass) {
-      const { error } = await supabase.auth.setSession({
-        access_token: session.access_token,
-        refresh_token: session.refresh_token,
-      });
-      if (error) {
-        console.error("Error establishing Supabase session:", error);
+    if (session?.access_token && session.access_token !== "mock-access-token" && session.access_token !== "employee-access-token") {
+      try {
+        const { error } = await supabase.auth.setSession({
+          access_token: session.access_token,
+          refresh_token: session.refresh_token,
+        });
+        if (error) {
+          console.error("Error establishing Supabase session:", error);
+        }
+      } catch (err) {
+        console.error("Set session error:", err);
       }
     }
 
-    if (emp.office_id) {
+    if (emp.office_id && emp.office_id !== "office-1") {
       try {
-        if (bypass) throw new Error("Bypassed remote office DB query via VITE_BYPASS_SUPABASE_FUNCTIONS config");
         const { data: officeResult } = await supabase
           .from("offices" as never)
           .select("id, name")
           .eq("id", emp.office_id)
           .maybeSingle();
+
         const officeData = officeResult as OfficeRow | null;
         if (officeData) {
           const mappedOffice = {
@@ -161,21 +164,13 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
           setOffice(mappedOffice);
           sessionStorage.setItem("arcolab_office", JSON.stringify(mappedOffice));
         } else {
-          throw new Error("Office not found in DB");
+          setOffice(null);
+          sessionStorage.removeItem("arcolab_office");
         }
       } catch (err) {
-        if (bypass) {
-          console.log("Loaded office using local mock fallback (Local Mode)");
-        } else {
-          console.warn("Error loading office during login, using local mock office fallback:", err);
-        }
-        const mappedOffice = {
-          id: emp.office_id || "office-1",
-          name: "Bengaluru Corporate Office",
-          short: "Bengaluru",
-        };
-        setOffice(mappedOffice);
-        sessionStorage.setItem("arcolab_office", JSON.stringify(mappedOffice));
+        console.error("Error loading office from database:", err);
+        setOffice(null);
+        sessionStorage.removeItem("arcolab_office");
       }
     } else {
       const storedOffice = sessionStorage.getItem("arcolab_office");

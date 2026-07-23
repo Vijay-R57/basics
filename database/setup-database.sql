@@ -4,7 +4,7 @@
 
 
 -- Create analysis_logs table to track all analyses
-CREATE TABLE public.analysis_logs (
+CREATE TABLE IF NOT EXISTS public.analysis_logs (
   id UUID NOT NULL DEFAULT gen_random_uuid() PRIMARY KEY,
   employee_id TEXT NOT NULL,
   employee_name TEXT NOT NULL,
@@ -20,6 +20,8 @@ CREATE TABLE public.analysis_logs (
 ALTER TABLE public.analysis_logs ENABLE ROW LEVEL SECURITY;
 
 -- Allow edge functions (service role) to insert
+DROP POLICY IF EXISTS "Service role can manage analysis_logs" ON public.analysis_logs;
+DROP POLICY IF EXISTS "Service role can manage analysis_logs" ON public.analysis_logs;
 CREATE POLICY "Service role can manage analysis_logs"
 ON public.analysis_logs
 FOR ALL
@@ -36,6 +38,7 @@ WITH CHECK (true);
 DROP POLICY "Service role can manage analysis_logs" ON public.analysis_logs;
 
 -- Only allow reading via anon (for display), inserts only via service role (edge functions)
+DROP POLICY IF EXISTS "Anyone can read analysis logs" ON public.analysis_logs;
 CREATE POLICY "Anyone can read analysis logs"
 ON public.analysis_logs
 FOR SELECT
@@ -65,6 +68,8 @@ VALUES (
 ON CONFLICT (id) DO NOTHING;
 
 -- Policy: Authenticated users (via service role / edge functions) can upload
+DROP POLICY IF EXISTS "Service role can upload 5s images" ON storage.objects;
+DROP POLICY IF EXISTS "Service role can upload 5s images" ON storage.objects;
 CREATE POLICY "Service role can upload 5s images"
 ON storage.objects
 FOR INSERT
@@ -72,6 +77,8 @@ TO authenticated
 WITH CHECK (bucket_id = '5s-images');
 
 -- Policy: Service role / edge functions can read/download images
+DROP POLICY IF EXISTS "Service role can read 5s images" ON storage.objects;
+DROP POLICY IF EXISTS "Service role can read 5s images" ON storage.objects;
 CREATE POLICY "Service role can read 5s images"
 ON storage.objects
 FOR SELECT
@@ -79,6 +86,8 @@ TO authenticated
 USING (bucket_id = '5s-images');
 
 -- Policy: Anyone can read if they have the signed URL (for display in frontend)
+DROP POLICY IF EXISTS "Anon can read 5s images by signed URL" ON storage.objects;
+DROP POLICY IF EXISTS "Anon can read 5s images by signed URL" ON storage.objects;
 CREATE POLICY "Anon can read 5s images by signed URL"
 ON storage.objects
 FOR SELECT
@@ -636,23 +645,28 @@ $$ LANGUAGE sql SECURITY DEFINER;
 
 -- Profiles policies
 DROP POLICY IF EXISTS "Users can view their own profile" ON public.profiles;
+DROP POLICY IF EXISTS "Users can view their own profile" ON public.profiles;
 CREATE POLICY "Users can view their own profile"
 ON public.profiles FOR SELECT USING (auth.uid() = id);
 
 DROP POLICY IF EXISTS "Users can update their own profile" ON public.profiles;
+DROP POLICY IF EXISTS "Users can update their own profile" ON public.profiles;
 CREATE POLICY "Users can update their own profile"
 ON public.profiles FOR UPDATE USING (auth.uid() = id) WITH CHECK (auth.uid() = id);
 
+DROP POLICY IF EXISTS "Supervisors/Admins can view all profiles" ON public.profiles;
 DROP POLICY IF EXISTS "Supervisors/Admins can view all profiles" ON public.profiles;
 CREATE POLICY "Supervisors/Admins can view all profiles"
 ON public.profiles FOR SELECT USING (public.get_current_role() IN ('supervisor', 'admin'));
 
 -- Offices select policy (restricted to authenticated users only)
 DROP POLICY IF EXISTS "Anyone can select offices" ON public.offices;
+DROP POLICY IF EXISTS "Anyone can select offices" ON public.offices;
 CREATE POLICY "Anyone can select offices"
 ON public.offices FOR SELECT TO authenticated USING (true);
 
 -- Recommendations policies
+DROP POLICY IF EXISTS "Users can view recommendations assigned to them or their logs" ON public.recommendations;
 DROP POLICY IF EXISTS "Users can view recommendations assigned to them or their logs" ON public.recommendations;
 CREATE POLICY "Users can view recommendations assigned to them or their logs"
 ON public.recommendations FOR SELECT USING (
@@ -663,6 +677,7 @@ ON public.recommendations FOR SELECT USING (
     )
 );
 
+DROP POLICY IF EXISTS "Supervisors and Admins can manage all recommendations" ON public.recommendations;
 DROP POLICY IF EXISTS "Supervisors and Admins can manage all recommendations" ON public.recommendations;
 CREATE POLICY "Supervisors and Admins can manage all recommendations"
 ON public.recommendations FOR ALL USING (public.get_current_role() IN ('supervisor', 'admin'));
@@ -820,6 +835,7 @@ CREATE TRIGGER before_analysis_log_insert
 -- The existing "Anyone can read analysis logs" policy uses USING (true) but
 -- is not explicitly set TO anon+authenticated. Add an explicit anon grant.
 DROP POLICY IF EXISTS "Anon can read analysis logs" ON public.analysis_logs;
+DROP POLICY IF EXISTS "Anon can read analysis logs" ON public.analysis_logs;
 CREATE POLICY "Anon can read analysis logs"
 ON public.analysis_logs
 FOR SELECT
@@ -827,6 +843,7 @@ TO anon
 USING (true);
 
 -- Also ensure authenticated users can read
+DROP POLICY IF EXISTS "Authenticated can read analysis logs" ON public.analysis_logs;
 DROP POLICY IF EXISTS "Authenticated can read analysis logs" ON public.analysis_logs;
 CREATE POLICY "Authenticated can read analysis logs"
 ON public.analysis_logs
@@ -855,6 +872,7 @@ DROP POLICY IF EXISTS "Anon can read analysis logs"          ON public.analysis_
 DROP POLICY IF EXISTS "Authenticated can read analysis logs" ON public.analysis_logs;
 
 -- 2. Supervisors and Admins can read ALL records
+DROP POLICY IF EXISTS "Supervisors and Admins can read all analysis logs" ON public.analysis_logs;
 CREATE POLICY "Supervisors and Admins can read all analysis logs"
 ON public.analysis_logs
 FOR SELECT
@@ -865,6 +883,7 @@ USING (
 
 -- 3. Workers can only read their own records
 --    Match by worker_id UUID (if resolved by trigger) OR by employee_code string
+DROP POLICY IF EXISTS "Workers can read own analysis logs" ON public.analysis_logs;
 CREATE POLICY "Workers can read own analysis logs"
 ON public.analysis_logs
 FOR SELECT
@@ -1235,39 +1254,47 @@ ALTER TABLE public.audit_item_responses  ENABLE ROW LEVEL SECURITY;
 
 -- Templates: all authenticated users can read
 DROP POLICY IF EXISTS "Authenticated can read templates" ON public.audit_templates;
+DROP POLICY IF EXISTS "Authenticated can read templates" ON public.audit_templates;
 CREATE POLICY "Authenticated can read templates"
     ON public.audit_templates FOR SELECT TO authenticated USING (true);
 
+DROP POLICY IF EXISTS "Authenticated can manage templates" ON public.audit_templates;
 DROP POLICY IF EXISTS "Authenticated can manage templates" ON public.audit_templates;
 CREATE POLICY "Authenticated can manage templates"
     ON public.audit_templates FOR ALL TO authenticated USING (true);
 
 -- Checklist items: all authenticated users can read
 DROP POLICY IF EXISTS "Authenticated can read checklist items" ON public.audit_checklist_items;
+DROP POLICY IF EXISTS "Authenticated can read checklist items" ON public.audit_checklist_items;
 CREATE POLICY "Authenticated can read checklist items"
     ON public.audit_checklist_items FOR SELECT TO authenticated USING (true);
 
+DROP POLICY IF EXISTS "Authenticated can manage checklist items" ON public.audit_checklist_items;
 DROP POLICY IF EXISTS "Authenticated can manage checklist items" ON public.audit_checklist_items;
 CREATE POLICY "Authenticated can manage checklist items"
     ON public.audit_checklist_items FOR ALL TO authenticated USING (true);
 
 -- Sessions: users see their own (auditor_id = their auth.uid())
 DROP POLICY IF EXISTS "Users can view own sessions" ON public.audit_sessions;
+DROP POLICY IF EXISTS "Users can view own sessions" ON public.audit_sessions;
 CREATE POLICY "Users can view own sessions"
     ON public.audit_sessions FOR SELECT TO authenticated
     USING (auditor_id = auth.uid());
 
+DROP POLICY IF EXISTS "Users can create sessions" ON public.audit_sessions;
 DROP POLICY IF EXISTS "Users can create sessions" ON public.audit_sessions;
 CREATE POLICY "Users can create sessions"
     ON public.audit_sessions FOR INSERT TO authenticated
     WITH CHECK (auditor_id = auth.uid());
 
 DROP POLICY IF EXISTS "Users can update own sessions" ON public.audit_sessions;
+DROP POLICY IF EXISTS "Users can update own sessions" ON public.audit_sessions;
 CREATE POLICY "Users can update own sessions"
     ON public.audit_sessions FOR UPDATE TO authenticated
     USING (auditor_id = auth.uid());
 
 -- Session items: follow session visibility
+DROP POLICY IF EXISTS "Session items follow session" ON public.audit_session_items;
 DROP POLICY IF EXISTS "Session items follow session" ON public.audit_session_items;
 CREATE POLICY "Session items follow session"
     ON public.audit_session_items FOR SELECT TO authenticated
@@ -1280,6 +1307,7 @@ CREATE POLICY "Session items follow session"
 
 -- Responses: follow session visibility
 DROP POLICY IF EXISTS "Responses select" ON public.audit_item_responses;
+DROP POLICY IF EXISTS "Responses select" ON public.audit_item_responses;
 CREATE POLICY "Responses select"
     ON public.audit_item_responses FOR SELECT TO authenticated
     USING (
@@ -1290,6 +1318,7 @@ CREATE POLICY "Responses select"
     );
 
 DROP POLICY IF EXISTS "Responses insert" ON public.audit_item_responses;
+DROP POLICY IF EXISTS "Responses insert" ON public.audit_item_responses;
 CREATE POLICY "Responses insert"
     ON public.audit_item_responses FOR INSERT TO authenticated
     WITH CHECK (
@@ -1299,6 +1328,7 @@ CREATE POLICY "Responses insert"
         )
     );
 
+DROP POLICY IF EXISTS "Responses update" ON public.audit_item_responses;
 DROP POLICY IF EXISTS "Responses update" ON public.audit_item_responses;
 CREATE POLICY "Responses update"
     ON public.audit_item_responses FOR UPDATE TO authenticated
@@ -1668,15 +1698,18 @@ ALTER TABLE public.audit_recommendations  ENABLE ROW LEVEL SECURITY;
 
 -- Prompt versions: read-only for all authenticated
 DROP POLICY IF EXISTS "Read prompt versions" ON public.audit_prompt_versions;
+DROP POLICY IF EXISTS "Read prompt versions" ON public.audit_prompt_versions;
 CREATE POLICY "Read prompt versions"
   ON public.audit_prompt_versions FOR SELECT TO authenticated USING (true);
 
 -- Critical rules: read-only for all authenticated
 DROP POLICY IF EXISTS "Read critical rules" ON public.audit_critical_rules;
+DROP POLICY IF EXISTS "Read critical rules" ON public.audit_critical_rules;
 CREATE POLICY "Read critical rules"
   ON public.audit_critical_rules FOR SELECT TO authenticated USING (true);
 
 -- Recommendations: follow session ownership
+DROP POLICY IF EXISTS "Read own recommendations" ON public.audit_recommendations;
 DROP POLICY IF EXISTS "Read own recommendations" ON public.audit_recommendations;
 CREATE POLICY "Read own recommendations"
   ON public.audit_recommendations FOR SELECT TO authenticated
@@ -1687,6 +1720,7 @@ CREATE POLICY "Read own recommendations"
     )
   );
 
+DROP POLICY IF EXISTS "Insert own recommendations" ON public.audit_recommendations;
 DROP POLICY IF EXISTS "Insert own recommendations" ON public.audit_recommendations;
 CREATE POLICY "Insert own recommendations"
   ON public.audit_recommendations FOR INSERT TO authenticated
@@ -2275,6 +2309,7 @@ CREATE INDEX IF NOT EXISTS idx_custom_rules_template_pillar
 ALTER TABLE public.audit_custom_rules ENABLE ROW LEVEL SECURITY;
 
 -- Edge functions (service role) can manage all rules
+DROP POLICY IF EXISTS "Service role can manage custom rules" ON public.audit_custom_rules;
 CREATE POLICY "Service role can manage custom rules"
   ON public.audit_custom_rules
   FOR ALL
@@ -2282,6 +2317,7 @@ CREATE POLICY "Service role can manage custom rules"
   WITH CHECK (true);
 
 -- Authenticated users can read active rules
+DROP POLICY IF EXISTS "Authenticated users can read custom rules" ON public.audit_custom_rules;
 CREATE POLICY "Authenticated users can read custom rules"
   ON public.audit_custom_rules
   FOR SELECT
@@ -2575,6 +2611,41 @@ BEGIN
       ('{"sub": "' || new_user_id || '", "email": "arc102@arcolab.com", "role": "worker", "first_name": "Guest", "last_name": "User", "employee_code": "ARC102", "email_verified": true, "phone_verified": false}')::jsonb,
       'email',
       'arc102@arcolab.com',
+      now(), now(), now()
+    );
+  END IF;
+END $$;
+
+-- User 4: ARC100 (Admin / Auditor)
+DO $$
+DECLARE
+  new_user_id UUID := gen_random_uuid();
+BEGIN
+  IF NOT EXISTS (SELECT 1 FROM auth.users WHERE email = 'arc100@arcolab.com') THEN
+    INSERT INTO auth.users (
+      instance_id, id, aud, role, email, encrypted_password, email_confirmed_at,
+      raw_app_meta_data, raw_user_meta_data, created_at, updated_at, is_super_admin
+    ) VALUES (
+      '00000000-0000-0000-0000-000000000000',
+      new_user_id,
+      'authenticated',
+      'authenticated',
+      'arc100@arcolab.com',
+      crypt('ARCOLAB100', gen_salt('bf', 10)),
+      now(),
+      '{"provider": "email", "providers": ["email"]}'::jsonb,
+      '{"first_name": "Vijay", "last_name": "Ramesh", "role": "admin", "employee_code": "ARC100"}'::jsonb,
+      now(), now(), false
+    );
+
+    INSERT INTO auth.identities (
+      id, user_id, identity_data, provider, provider_id, last_sign_in_at, created_at, updated_at
+    ) VALUES (
+      gen_random_uuid(),
+      new_user_id,
+      ('{"sub": "' || new_user_id || '", "email": "arc100@arcolab.com", "role": "admin", "first_name": "Vijay", "last_name": "Ramesh", "employee_code": "ARC100", "email_verified": true, "phone_verified": false}')::jsonb,
+      'email',
+      'arc100@arcolab.com',
       now(), now(), now()
     );
   END IF;

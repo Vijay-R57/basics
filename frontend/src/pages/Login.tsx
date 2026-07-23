@@ -52,6 +52,7 @@ const Login = () => {
 
       if (fnError && (
         fnError.name === "FunctionsFetchError" || 
+        fnError instanceof FunctionsHttpError ||
         fnError.message?.includes("Failed to send a request") ||
         fnError.message?.includes("Edge Function not found") || 
         fnError.status === 404 ||

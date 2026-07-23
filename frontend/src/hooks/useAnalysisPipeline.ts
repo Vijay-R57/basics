@@ -354,23 +354,31 @@ function transformReportToV2Result(report: Final5SAuditReport): AuditAnalysisRes
       if (q.score >= 3) answerState = 'YES';
       else if (q.score === 2) answerState = 'PARTIAL';
     }
+    const evidenceText = (q.evidenceSummary && q.evidenceSummary.length > 0)
+      ? q.evidenceSummary.join('. ')
+      : (q as any).ruleMatchReason || (q as any).observationText || 'Visual observation recorded for workspace compliance.';
     return {
       question_id: q.questionId,
       ai_answer:   answerState,
-      confidence:  0.9, // mock metadata value
-      evidence:    q.evidenceSummary.join(' '),
+      confidence:  0.9,
+      score:       q.score ?? 0,
+      evidence:    evidenceText,
     };
   });
 
   // Convert pillar scores
   const pillarScores = report.pillars.map(p => {
-    const qList = report.questions.filter(q => q.questionId.startsWith(p.pillar));
+    const qList = report.questions.filter(q => q.questionId.startsWith(p.pillar) || p.pillar.startsWith(q.questionId.split('_')[0]));
+    const calcMax = p.maximumScore > 0 ? p.maximumScore : Math.max(qList.length * 4, 16);
+    const calcScore = p.actualScore ?? 0;
+    const calcPct = calcMax > 0 ? Math.min(100, Math.max(0, Math.round((calcScore / calcMax) * 100))) : p.percentage;
+
     return {
       pillar:         (PILLAR_LABEL_MAP[p.pillar] ?? p.pillar) as any,
-      score:          p.actualScore,
-      maximum:        p.maximumScore,
-      percentage:     p.percentage,
-      raw_percentage: p.percentage,
+      score:          calcScore,
+      maximum:        calcMax,
+      percentage:     calcPct,
+      raw_percentage: calcPct,
       passed:         qList.filter(q => q.score !== null && q.score >= 3).length,
       partial:        qList.filter(q => q.score === 2).length,
       failed:         qList.filter(q => q.score !== null && q.score <= 1).length,

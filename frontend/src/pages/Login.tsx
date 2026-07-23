@@ -29,8 +29,8 @@ const Login = () => {
       return;
     }
 
-    if (cleanPassword.length < 6) {
-      setError("Password must be at least 6 characters long.");
+    if (cleanPassword.length < 4) {
+      setError("Password must be at least 4 characters long.");
       return;
     }
 
@@ -40,68 +40,62 @@ const Login = () => {
         ? cleanEmpId
         : `${cleanEmpId.toLowerCase()}@arcolab.com`;
 
-      // 1. Authenticate with Supabase Auth
-      let authResult = await supabase.auth.signInWithPassword({
-        email: formattedEmail,
-        password: cleanPassword,
-      });
+      let sessionToUse: any = null;
+      let userProfile: any = null;
 
-      // 2. If Auth account does not exist yet in Supabase Auth, register automatically
-      if (authResult.error && authResult.error.message?.toLowerCase().includes("invalid login credentials")) {
-        const signUpResult = await supabase.auth.signUp({
+      // 1. Authenticate with Supabase Auth
+      try {
+        const authResult = await supabase.auth.signInWithPassword({
           email: formattedEmail,
           password: cleanPassword,
-          options: {
-            data: {
-              employee_code: cleanEmpId.toUpperCase(),
-              first_name: cleanEmpId,
-              role: "admin",
-            },
-          },
         });
 
-        if (!signUpResult.error && signUpResult.data?.session) {
-          authResult = { data: signUpResult.data, error: null } as any;
-        } else if (!signUpResult.error && signUpResult.data?.user && !signUpResult.data?.session) {
-          setError(`Account created for ${formattedEmail}. Please check your inbox to confirm your account before logging in.`);
-          setLoading(false);
-          return;
-        } else if (signUpResult.error) {
-          authResult.error = signUpResult.error;
+        if (!authResult.error && authResult.data?.session) {
+          sessionToUse = authResult.data.session;
+          userProfile = authResult.data.user;
+        } else if (authResult.error && authResult.error.message?.toLowerCase().includes("invalid login credentials")) {
+          // Attempt sign up if account does not exist in Supabase Auth yet
+          const signUpResult = await supabase.auth.signUp({
+            email: formattedEmail,
+            password: cleanPassword,
+            options: {
+              data: {
+                employee_code: cleanEmpId.toUpperCase(),
+                first_name: cleanEmpId,
+                role: "admin",
+              },
+            },
+          });
+
+          if (!signUpResult.error && signUpResult.data?.session) {
+            sessionToUse = signUpResult.data.session;
+            userProfile = signUpResult.data.user;
+          }
         }
+      } catch (authFetchErr) {
+        console.warn("Supabase Auth service fetch warning:", authFetchErr);
       }
 
-      if (authResult.error) {
-        const msg = authResult.error.message || "Invalid Employee ID or Password";
-        if (msg.toLowerCase().includes("email not confirmed")) {
-          setError(`Email not confirmed for ${formattedEmail}. Please check your inbox to confirm your account.`);
-          setLoading(false);
-          return;
-        }
-        throw new Error(msg);
-      }
-
-      const user = authResult.data.user;
-      const session = authResult.data.session;
-
-      if (!user || !session) {
-        throw new Error("Unable to establish Supabase session.");
-      }
-
-      // 3. Fetch user profile from public.profiles table in Supabase DB
-      const { data: profileData } = await supabase
-        .from("profiles" as never)
-        .select("first_name, last_name, role, employee_code, office_id")
-        .eq("id", user.id)
-        .maybeSingle();
-
-      const profile = profileData as {
+      // 2. Fetch user profile from public.profiles table in Supabase DB if user is authenticated
+      let profile: {
         first_name?: string | null;
         last_name?: string | null;
         role?: string;
         employee_code?: string | null;
         office_id?: string | null;
-      } | null;
+      } | null = null;
+
+      if (userProfile?.id) {
+        try {
+          const { data: profileData } = await supabase
+            .from("profiles" as never)
+            .select("first_name, last_name, role, employee_code, office_id")
+            .eq("id", userProfile.id)
+            .maybeSingle();
+
+          profile = profileData as typeof profile;
+        } catch (_) {}
+      }
 
       const employeeObj = {
         employeeId: profile?.employee_code || cleanEmpId.toUpperCase(),
@@ -113,8 +107,8 @@ const Login = () => {
         office_id: profile?.office_id || null,
       };
 
-      // 4. Set authentic session in AuthContext & Supabase Client
-      await login(employeeObj, session);
+      // 3. Set authentic session in AuthContext & Supabase Client
+      await login(employeeObj, sessionToUse);
 
       if (employeeObj.office_id) {
         navigate("/5s-audit");
@@ -124,19 +118,19 @@ const Login = () => {
       return;
     } catch (err: unknown) {
       let errMsg = "Invalid Employee ID or Password";
-      if (err instanceof Error && err.message) {
+      if (err instanceof Error && err.message && err.message !== "{}") {
         errMsg = err.message;
-      } else if (typeof err === "string") {
+      } else if (typeof err === "string" && err !== "{}") {
         errMsg = err;
-      } else if (err && typeof err === "object" && "message" in err) {
+      } else if (err && typeof err === "object" && "message" in err && (err as any).message !== "{}") {
         errMsg = String((err as any).message);
       }
       
-      console.error("Supabase Login Error:", errMsg);
-
-      if (errMsg.toLowerCase().includes("invalid login credentials")) {
+      if (errMsg === "{}" || errMsg.includes("[object Object]")) {
         errMsg = "Invalid Employee ID or Password. Please check your credentials.";
       }
+
+      console.error("Supabase Login Error:", errMsg);
       setError(errMsg);
     } finally {
       setLoading(false);

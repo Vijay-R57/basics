@@ -26,6 +26,11 @@ timeline
     2026-07-19 : Phase 5: Prompt Refinement & Rating Documentation
                : - Integrated strict Uncertainty Contract rules in prompt
                : - Created detailed rating definitions and scoring maps
+    2026-07-23 : Phase 6: The Main Golden Pipeline & Supabase Architecture
+               : - Mapped Main GOLDENPIPELINE Architecture
+               : - 20-Question Vision Perception & Interactive Questionnaire Trigger Flow
+               : - Supabase SSR, Edge Functions & Idempotent Master Database Schema
+               : - Fail-Safe Authentication & Facility Check-In Flow
 ```
 
 ---
@@ -94,3 +99,26 @@ timeline
   * **Prompt Refinement (Uncertainty Contract)**: Programmed strict average rating fallback rules when visual evidence is insufficient, preventing descriptive variance or overrides.
   * **Rating Definitions**: Created [rating_definitions.md](file:///c:/Users/Vijay%20Ramesh/5S/basics/rating_definitions.md) documenting VERY_GOOD, GOOD, AVERAGE, BAD, and VERY_BAD ratings, compliance answer mappings, and evidence consistency controls.
   * **Scoring Mapping**: Created [scoring_mapping.md](file:///c:/Users/Vijay%20Ramesh/5S/basics/scoring_mapping.md) documenting scoring conversions, pillar score calculations, overall score formulas, and grade/color thresholds.
+
+---
+
+### 🌟 Phase 6: The Main GOLDENPIPELINE Integration (July 23, 2026)
+* **Goal**: Map and establish `GOLDENPIPELINE` as the authoritative main production baseline for 5S Audit Analysis, interactive questionnaire triggers, Supabase SSR, Edge Functions, and database schema idempotency.
+* **Branch Reference**: `GOLDENPIPELINE` (`6089343`)
+* **Key Achievements & Deliverables**:
+  * **Golden Pipeline Perception & Validation Engine**:
+    * Programmed the **20 authoritative 5S audit questions** across **SORT**, **SET IN ORDER**, **SHINE**, **STANDARDIZE**, and **SUSTAIN**.
+    * Enforced the **Visibility Decision Gate** and **Standardized Uncertainty Contract** (`rating: "AVERAGE"`, `confidence: 30`, `reason: "Cannot be determined from the provided image."`).
+    * Application-owned mathematical scoring formula ($0-80$ max score, $0-100\%$ percentage, grade labels) completely decoupled from LLM output.
+  * **Interactive Questionnaire Trigger Flow**:
+    * Integrated interactive user assessment for undefined visual reason questions (`Cannot be determined...`).
+    * Renders `👤 User Assessed` visual indicators in the pillar audit breakdown cards when confirmed by the auditor.
+  * **Supabase SSR & Edge Functions**:
+    * Integrated `@supabase/ssr` with browser client helpers ([frontend/src/utils/supabase/client.ts](file:///c:/Users/Vijay%20Ramesh/5S/basics/frontend/src/utils/supabase/client.ts)).
+    * Deployed Deno Edge Functions `analyze-5s`, `employee-login`, and `save-analysis-log` to live Supabase project `fmvrphwhyjgavikgwzus`.
+  * **Idempotent Master Database Architecture**:
+    * Enhanced [database/setup-database.sql](file:///c:/Users/Vijay%20Ramesh/5S/basics/database/setup-database.sql) with `CREATE TABLE IF NOT EXISTS` and `DROP POLICY IF EXISTS` across all 11 core tables and `5s-images` storage bucket.
+    * Seeded default user `ARC100` with password `ARCOLAB100` (`admin` role).
+  * **Fail-Safe Authentication & Facility Check-In**:
+    * Refined [Login.tsx](file:///c:/Users/Vijay%20Ramesh/5S/basics/frontend/src/pages/Login.tsx) to handle unseeded authentication states quietly and seamlessly transition into active sessions.
+    * Configured facility cards in [OfficeSelection.tsx](file:///c:/Users/Vijay%20Ramesh/5S/basics/frontend/src/pages/OfficeSelection.tsx) (*Bengaluru Corporate Office, Mumbai Manufacturing Hub, Hyderabad R&D Center, Chennai Operations Site*).

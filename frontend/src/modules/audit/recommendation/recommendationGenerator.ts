@@ -23,8 +23,8 @@ import { sortQuestionRecommendations } from './recommendationPriority';
 import { debugLog, debugGroup, debugGroupEnd, debugError } from '../pipeline/debug';
 
 const GEMINI_API_BASE = 'https://generativelanguage.googleapis.com/v1beta/models';
-const PRIMARY_MODEL   = 'gemini-2.5-flash';
-const RETRY_MODEL     = 'gemini-1.5-flash';
+const PRIMARY_MODEL   = 'gemini-3.6-flash';
+const RETRY_MODEL     = 'gemini-flash-latest';
 
 /** Calls Gemini text API. */
 async function callGeminiText(

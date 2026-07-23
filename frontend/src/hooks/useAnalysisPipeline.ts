@@ -415,7 +415,7 @@ function transformReportToV2Result(report: Final5SAuditReport): AuditAnalysisRes
       version: report.metadata.configurationVersion,
     },
     prompt_version:    'v3.0',
-    vision_model:      'gemini-2.5-flash',
+    vision_model:      'gemini-3.6-flash',
     schema_version:    '3.0',
     audit_confidence:  0.9,
     before: {

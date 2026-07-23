@@ -44,10 +44,10 @@ import {
 // ── Model configuration ───────────────────────────────────────────────────────
 
 /** Primary model for visual perception. */
-const PRIMARY_MODEL = 'gemini-2.5-flash';
+const PRIMARY_MODEL = 'gemini-3.6-flash';
 
 /** Fallback model used on the single retry attempt. */
-const RETRY_MODEL = 'gemini-1.5-flash';
+const RETRY_MODEL = 'gemini-flash-latest';
 
 /** Gemini API base URL. */
 const GEMINI_API_BASE = 'https://generativelanguage.googleapis.com/v1beta/models';

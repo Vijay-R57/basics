@@ -21,15 +21,21 @@ const Login = () => {
     e.preventDefault();
     setError("");
 
-    if (!employeeId.trim() || !password.trim()) {
+    const cleanEmpId = employeeId.trim();
+    const cleanPassword = password.trim();
+
+    if (!cleanEmpId || !cleanPassword) {
       setError("Please enter both Employee ID and Password");
+      return;
+    }
+
+    if (cleanPassword.length < 6) {
+      setError("Password must be at least 6 characters long.");
       return;
     }
 
     setLoading(true);
     try {
-      const cleanEmpId = employeeId.trim();
-      const cleanPassword = password.trim();
       const formattedEmail = cleanEmpId.includes("@")
         ? cleanEmpId
         : `${cleanEmpId.toLowerCase()}@arcolab.com`;
@@ -60,6 +66,8 @@ const Login = () => {
           setError(`Account created for ${formattedEmail}. Please check your inbox to confirm your account before logging in.`);
           setLoading(false);
           return;
+        } else if (signUpResult.error) {
+          authResult.error = signUpResult.error;
         }
       }
 
@@ -115,7 +123,6 @@ const Login = () => {
       }
       return;
     } catch (err: unknown) {
-      console.error("Supabase Login Error:", err);
       let errMsg = "Invalid Employee ID or Password";
       if (err instanceof Error && err.message) {
         errMsg = err.message;
@@ -123,6 +130,12 @@ const Login = () => {
         errMsg = err;
       } else if (err && typeof err === "object" && "message" in err) {
         errMsg = String((err as any).message);
+      }
+      
+      console.error("Supabase Login Error:", errMsg);
+
+      if (errMsg.toLowerCase().includes("invalid login credentials")) {
+        errMsg = "Invalid Employee ID or Password. Please check your credentials.";
       }
       setError(errMsg);
     } finally {

@@ -56,17 +56,21 @@ const Login = () => {
 
         if (!signUpResult.error && signUpResult.data?.session) {
           authResult = { data: signUpResult.data, error: null } as any;
-        } else if (signUpResult.data?.user && !signUpResult.data?.session) {
-          // Retry sign in if user was created but session needs activation
-          authResult = await supabase.auth.signInWithPassword({
-            email: formattedEmail,
-            password: cleanPassword,
-          });
+        } else if (!signUpResult.error && signUpResult.data?.user && !signUpResult.data?.session) {
+          setError(`Account created for ${formattedEmail}. Please check your inbox to confirm your account before logging in.`);
+          setLoading(false);
+          return;
         }
       }
 
       if (authResult.error) {
-        throw new Error(authResult.error.message || "Invalid Employee ID or Password");
+        const msg = authResult.error.message || "Invalid Employee ID or Password";
+        if (msg.toLowerCase().includes("email not confirmed")) {
+          setError(`Email not confirmed for ${formattedEmail}. Please check your inbox to confirm your account.`);
+          setLoading(false);
+          return;
+        }
+        throw new Error(msg);
       }
 
       const user = authResult.data.user;
@@ -112,7 +116,14 @@ const Login = () => {
       return;
     } catch (err: unknown) {
       console.error("Supabase Login Error:", err);
-      const errMsg = err instanceof Error ? err.message : "Invalid Employee ID or Password";
+      let errMsg = "Invalid Employee ID or Password";
+      if (err instanceof Error && err.message) {
+        errMsg = err.message;
+      } else if (typeof err === "string") {
+        errMsg = err;
+      } else if (err && typeof err === "object" && "message" in err) {
+        errMsg = String((err as any).message);
+      }
       setError(errMsg);
     } finally {
       setLoading(false);
